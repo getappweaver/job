@@ -9,6 +9,7 @@ import { join } from 'path';
 import type { Database } from 'bun:sqlite';
 
 import { createBackend } from '@src/backends/factory';
+import { getOutputString } from '@src/backends/types';
 import type { PluginContext } from '@src/core/plugin';
 import { log } from '@src/logger';
 import { dmBotRoot } from '@src/paths';
@@ -32,7 +33,11 @@ export type RunJobProps = {
 /**
  * Run a single job: build backend from job row, resolve session (cron: reuse job.session_id or create and persist), run message, update run and job times.
  */
-export async function runJob({ job, pluginDb, ctx }: RunJobProps): Promise<void> {
+export async function runJob({
+  job,
+  pluginDb,
+  ctx,
+}: RunJobProps): Promise<void> {
   const runId = insertJobRun(pluginDb, job.id);
   const startedAt = Date.now();
 
@@ -59,7 +64,8 @@ export async function runJob({ job, pluginDb, ctx }: RunJobProps): Promise<void>
         ? job.session_id
         : await backend.createSession({ cwd: dmBotRoot, env: ctx.env });
 
-    const cwd = job.workspace_target === 'bot' ? dmBotRoot : join(dmBotRoot, '..');
+    const cwd =
+      job.workspace_target === 'bot' ? dmBotRoot : join(dmBotRoot, '..');
 
     const result = await backend.runMessage({
       sessionId,
@@ -70,7 +76,7 @@ export async function runJob({ job, pluginDb, ctx }: RunJobProps): Promise<void>
       modelOverride: job.model,
     });
 
-    output = result.output;
+    output = getOutputString(result);
     success = result.type === 'success';
 
     if (job.execution_type === 'cron' && job.session_id == null) {

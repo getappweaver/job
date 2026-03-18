@@ -50,14 +50,20 @@ export const OneTimeJobSchema = JobBaseSchema.extend({
   max_runs: z.null(),
 });
 
-export const JobSchema = z.discriminatedUnion('execution_type', [CronJobSchema, OneTimeJobSchema]);
+export const JobSchema = z.discriminatedUnion('execution_type', [
+  CronJobSchema,
+  OneTimeJobSchema,
+]);
 
 export type CronJob = z.infer<typeof CronJobSchema>;
 export type OneTimeJob = z.infer<typeof OneTimeJobSchema>;
 export type Job = CronJob | OneTimeJob;
 
 /** Minimal shape needed for getNextRunAt; derived from Job so Job is always assignable. */
-export type GetNextRunAtJob = Pick<Job, 'execution_type' | 'schedule' | 'run_at' | 'max_runs'>;
+export type GetNextRunAtJob = Pick<
+  Job,
+  'execution_type' | 'schedule' | 'run_at' | 'max_runs'
+>;
 
 export const JobRunSchema = z.object({
   id: z.number(),

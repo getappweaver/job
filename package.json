@@ -1,6 +1,6 @@
 {
   "name": "dm-bot-job-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "dmBot": {
     "coreApiVersion": "^6.0.0",
     "description": "Scheduled job management plugin for dm-bot"

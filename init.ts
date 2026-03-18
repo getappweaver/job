@@ -5,7 +5,11 @@ import { basename, join } from 'path';
 
 import { Database } from 'bun:sqlite';
 
-import { parsePluginPackageJson, type BotPlugin, type PluginContext } from '@src/core/plugin';
+import {
+  parsePluginPackageJson,
+  type BotPlugin,
+  type PluginContext,
+} from '@src/core/plugin';
 
 import { handleJob } from './commands';
 import { createJobTables } from './db';

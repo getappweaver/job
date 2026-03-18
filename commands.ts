@@ -6,8 +6,20 @@ import type { Database } from 'bun:sqlite';
 
 import type { PluginContext, PluginIdentity } from '@src/core/plugin';
 
-import { buildRevisePrompt, formatCreateWithPreview, generateCreateWithParams } from './ai';
-import { createJob, deleteJob, disableJob, enableJob, getJob, listJobRuns, listJobs } from './db';
+import {
+  buildRevisePrompt,
+  formatCreateWithPreview,
+  generateCreateWithParams,
+} from './ai';
+import {
+  createJob,
+  deleteJob,
+  disableJob,
+  enableJob,
+  getJob,
+  listJobRuns,
+  listJobs,
+} from './db';
 import { deleteDraft, getDraft, listDrafts, storeDraft } from './drafts';
 import { runJob } from './runner';
 import type { JobDraftInput, Job } from './types';
@@ -84,9 +96,31 @@ export async function handleJob({
 
     const lines = drafts.map((d) => {
       const s =
-        d.draftInput.execution_type === 'cron' ? d.draftInput.schedule : d.draftInput.run_at;
+        d.kind === 'create'
+          ? d.input.execution_type === 'cron'
+            ? d.input.schedule
+            : d.input.run_at
+          : d.kind === 'update'
+            ? d.input.execution_type === 'cron'
+              ? d.input.schedule
+              : d.input.run_at
+            : '(delete)';
 
-      return `${d.id} | ${d.draftInput.name} | ${s} | ${d.draftInput.schedule_description}`;
+      const name =
+        d.kind === 'delete'
+          ? `(delete #${d.input.id})`
+          : d.kind === 'update'
+            ? d.input.name
+            : d.input.name;
+
+      const desc =
+        d.kind === 'delete'
+          ? '(delete)'
+          : d.kind === 'update'
+            ? d.input.schedule_description
+            : d.input.schedule_description;
+
+      return `${d.id} | ${name} | ${s} | ${desc}`;
     });
 
     return `Pending drafts:\n${lines.join('\n')}\n\n${cmd} confirm <id> | ${cmd} revise <id> <corrections> | ${cmd} discard <id>`;
@@ -115,11 +149,17 @@ export async function handleJob({
     }
 
     try {
-      const job = createJob(pluginDb, entry.draftInput);
+      if (entry.kind !== 'create') {
+        return `Draft ${draftId} is not a create draft (kind: ${entry.kind}).`;
+      }
+
+      const job = createJob(pluginDb, entry.input);
       deleteDraft(pluginDb, draftId);
 
       const budgetLine =
-        job.budget_sats != null ? `\nBudget: ${job.budget_sats} sats (auto-flow)` : '';
+        job.budget_sats != null
+          ? `\nBudget: ${job.budget_sats} sats (auto-flow)`
+          : '';
 
       return `Job created: ${job.id}\nName: ${job.name}\nWhen: ${job.schedule_description}\nNext run: ${formatNextRun(job.next_run_at)}${budgetLine}`;
     } catch (err) {
@@ -153,6 +193,10 @@ export async function handleJob({
       return `Draft not found: ${draftId}.`;
     }
 
+    if (entry.kind !== 'create') {
+      return `Draft ${draftId} is not a create draft (kind: ${entry.kind}).`;
+    }
+
     let input: JobDraftInput;
 
     try {
@@ -169,7 +213,7 @@ export async function handleJob({
 
     const newDraftId = storeDraft(pluginDb, {
       kind: 'create',
-      draftInput: input,
+      input,
       originalPrompt: `${entry.originalPrompt} (revised: ${corrections})`,
     });
 
@@ -356,7 +400,9 @@ export async function handleJob({
       });
 
       const duration =
-        r.finished_at != null ? `${Math.round((r.finished_at - r.started_at) / 1000)}s` : '—';
+        r.finished_at != null
+          ? `${Math.round((r.finished_at - r.started_at) / 1000)}s`
+          : '—';
 
       const err = r.error ? `: ${r.error.slice(0, 40)}…` : '';
 

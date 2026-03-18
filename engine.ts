@@ -8,7 +8,12 @@ import type { Database } from 'bun:sqlite';
 
 import { log } from '@src/logger';
 
-import { getJobRunCount, getNextRunAt, listDueJobs, updateJobRunTimes } from './db';
+import {
+  getJobRunCount,
+  getNextRunAt,
+  listDueJobs,
+  updateJobRunTimes,
+} from './db';
 import { JobPluginContext } from './init';
 import { runJob } from './runner';
 

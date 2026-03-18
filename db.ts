@@ -52,7 +52,10 @@ export function createJobTables(db: Database): void {
     )
   `);
 
-  db.run('CREATE INDEX IF NOT EXISTS idx_jobs_next_run_at ON jobs(next_run_at)');
+  db.run(
+    'CREATE INDEX IF NOT EXISTS idx_jobs_next_run_at ON jobs(next_run_at)',
+  );
+
   db.run('CREATE INDEX IF NOT EXISTS idx_job_runs_job_id ON job_runs(job_id)');
 }
 
@@ -162,14 +165,15 @@ function rowToJobRun(row: Record<string, unknown>): JobRun {
     status: row.status as JobRunStatus,
     output: row.output != null ? String(row.output) : null,
     error: row.error != null ? String(row.error) : null,
-    budget_used_msats: row.budget_used_msats != null ? Number(row.budget_used_msats) : null,
+    budget_used_msats:
+      row.budget_used_msats != null ? Number(row.budget_used_msats) : null,
   });
 }
 
 export function getJobRunCount(db: Database, jobId: number): number {
   const row = db
     .prepare('SELECT COUNT(*) as c FROM job_runs WHERE job_id = $jobId')
-    .get({ $jobId: jobId }) as { c: number };
+    .get({ jobId }) as { c: number };
 
   return Number(row?.c ?? 0);
 }
@@ -199,30 +203,39 @@ export function createJob(db: Database, input: JobDraftInput): Job {
       throw new Error('Could not compute next run time');
     }
 
-    const info = db.run(
-      `INSERT INTO jobs (name, schedule, schedule_description, prompt, enabled, created_at,last_run_at, next_run_at, backend, provider, model, mode, workspace_target, session_id, budget_sats, instructions, execution_type, run_at, max_runs)
-       VALUES ($name, $schedule, $scheduleDescription, $prompt, 1, $createdAt, 
-       NULL, $nextRunAt, $backend, $provider, $model, $mode, $workspaceTarget, 
-       NULL, $budgetSats, $instructions, 'cron', NULL, $maxRuns)`,
-      [
-        {
-          $name: input.name,
-          $schedule: validated.cron,
-          $scheduleDescription: input.schedule_description,
-          $prompt: input.prompt,
-          $createdAt: now,
-          $nextRunAt: next_run_at,
-          $backend: input.backend,
-          $provider: input.provider,
-          $model: input.model,
-          $mode: input.mode,
-          $workspaceTarget: input.workspace_target,
-          $budgetSats: input.budget_sats,
-          $instructions: input.instructions,
-          $maxRuns: input.maxRuns,
-        },
-      ],
-    );
+    const info = db
+      .query(
+        `INSERT INTO jobs (
+           name, schedule, schedule_description, prompt,
+           enabled, created_at, last_run_at, next_run_at,
+           backend, provider, model, mode, workspace_target,
+           session_id, budget_sats, instructions,
+           execution_type, run_at, max_runs
+         )
+         VALUES (
+           $name, $schedule, $scheduleDescription, $prompt,
+           1, $createdAt, NULL, $nextRunAt,
+           $backend, $provider, $model, $mode, $workspaceTarget,
+           NULL, $budgetSats, $instructions,
+           'cron', NULL, $maxRuns
+         )`,
+      )
+      .run({
+        name: input.name,
+        schedule: validated.cron,
+        scheduleDescription: input.schedule_description,
+        prompt: input.prompt,
+        createdAt: now,
+        nextRunAt: next_run_at,
+        backend: input.backend,
+        provider: input.provider,
+        model: input.model,
+        mode: input.mode,
+        workspaceTarget: input.workspace_target,
+        budgetSats: input.budget_sats,
+        instructions: input.instructions,
+        maxRuns: input.maxRuns,
+      });
 
     return getJob(db, Number(info.lastInsertRowid))!;
   } else {
@@ -232,38 +245,48 @@ export function createJob(db: Database, input: JobDraftInput): Job {
       throw new Error('run_at must be in the future');
     }
 
-    const info = db.run(
-      `INSERT INTO jobs (name, schedule, schedule_description, prompt, enabled, created_at, last_run_at, next_run_at, backend, provider, model, mode, workspace_target, session_id, budget_sats, instructions, execution_type, run_at, max_runs)
-       VALUES ($name, $schedule, $scheduleDescription, $prompt, 1, $createdAt, NULL, $nextRunAt, $backend, $provider, $model, $mode, $workspaceTarget, NULL, $budgetSats, $instructions, 'one-time', $runAt, NULL)`,
-      [
-        {
-          $name: input.name,
-          $schedule: 'once',
-          $scheduleDescription: input.schedule_description,
-          $prompt: input.prompt,
-          $createdAt: now,
-          $nextRunAt: runAtMs,
-          $backend: input.backend,
-          $provider: input.provider,
-          $model: input.model,
-          $mode: input.mode,
-          $workspaceTarget: input.workspace_target,
-          $budgetSats: input.budget_sats,
-          $instructions: input.instructions,
-          $runAt: runAtMs,
-        },
-      ],
-    );
+    const info = db
+      .query(
+        `INSERT INTO jobs (
+           name, schedule, schedule_description, prompt,
+           enabled, created_at, last_run_at, next_run_at,
+           backend, provider, model, mode, workspace_target,
+           session_id, budget_sats, instructions,
+           execution_type, run_at, max_runs
+         )
+         VALUES (
+           $name, $schedule, $scheduleDescription, $prompt,
+           1, $createdAt, NULL, $nextRunAt,
+           $backend, $provider, $model, $mode, $workspaceTarget,
+           NULL, $budgetSats, $instructions,
+           'one-time', $runAt, NULL
+         )`,
+      )
+      .run({
+        name: input.name,
+        schedule: 'once',
+        scheduleDescription: input.schedule_description,
+        prompt: input.prompt,
+        createdAt: now,
+        nextRunAt: runAtMs,
+        backend: input.backend,
+        provider: input.provider,
+        model: input.model,
+        mode: input.mode,
+        workspaceTarget: input.workspace_target,
+        budgetSats: input.budget_sats,
+        instructions: input.instructions,
+        runAt: runAtMs,
+      });
 
     return getJob(db, Number(info.lastInsertRowid))!;
   }
 }
 
 export function listJobs(db: Database): Job[] {
-  const rows = db.prepare('SELECT * FROM jobs ORDER BY next_run_at ASC').all() as Record<
-    string,
-    unknown
-  >[];
+  const rows = db
+    .prepare('SELECT * FROM jobs ORDER BY next_run_at ASC')
+    .all() as Record<string, unknown>[];
 
   return rows.map(rowToJob);
 }
@@ -282,7 +305,11 @@ export function deleteJob(db: Database, id: number): boolean {
   return info.changes > 0;
 }
 
-export function updateJobSessionId(db: Database, id: number, sessionId: string): void {
+export function updateJobSessionId(
+  db: Database,
+  id: number,
+  sessionId: string,
+): void {
   db.prepare('UPDATE jobs SET session_id = ? WHERE id = ?').run(sessionId, id);
 }
 
@@ -300,13 +327,18 @@ export function enableJob(db: Database, id: number): boolean {
     return false;
   }
 
-  db.prepare('UPDATE jobs SET enabled = 1, next_run_at = ? WHERE id = ?').run(next_run_at, id);
+  db.prepare('UPDATE jobs SET enabled = 1, next_run_at = ? WHERE id = ?').run(
+    next_run_at,
+    id,
+  );
 
   return true;
 }
 
 export function disableJob(db: Database, id: number): boolean {
-  const info = db.prepare('UPDATE jobs SET enabled = 0, next_run_at = NULL WHERE id = ?').run(id);
+  const info = db
+    .prepare('UPDATE jobs SET enabled = 0, next_run_at = NULL WHERE id = ?')
+    .run(id);
 
   return info.changes > 0;
 }
@@ -318,10 +350,10 @@ export function listDueJobs(db: Database): Job[] {
   const now = Date.now();
 
   const rows = db
-    .prepare(
+    .query(
       'SELECT * FROM jobs WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= $now',
     )
-    .all(now) as Record<string, unknown>[];
+    .all({ now }) as Record<string, unknown>[];
 
   return rows.map(rowToJob);
 }
@@ -332,14 +364,16 @@ export function updateJobRunTimes(
   lastRunAt: number,
   nextRunAt: number | null,
 ): void {
-  db.prepare('UPDATE jobs SET last_run_at = ?, next_run_at = ? WHERE id = ?').run(
-    lastRunAt,
-    nextRunAt,
-    jobId,
-  );
+  db.prepare(
+    'UPDATE jobs SET last_run_at = ?, next_run_at = ? WHERE id = ?',
+  ).run(lastRunAt, nextRunAt, jobId);
 }
 
-export function listJobRuns(db: Database, jobId: number, limit: number): JobRun[] {
+export function listJobRuns(
+  db: Database,
+  jobId: number,
+  limit: number,
+): JobRun[] {
   const rows = db
     .prepare('SELECT * FROM job_runs WHERE job_id = ? ORDER BY id DESC LIMIT ?')
     .all(jobId, limit) as Record<string, unknown>[];
@@ -351,10 +385,10 @@ export function insertJobRun(db: Database, jobId: number): number {
   const now = Date.now();
 
   const info = db
-    .prepare(
-      'INSERT INTO job_runs (job_id, started_at, finished_at, status, output, error) VALUES ($jobId, $startedAt, NULL, $status, NULL, NULL)',
+    .query(
+      'INSERT INTO job_runs (job_id, started_at, finished_at, status, output, error) VALUES (?, ?, NULL, ?, NULL, NULL)',
     )
-    .run({ $jobId: jobId, $startedAt: now, $status: 'running' });
+    .run(jobId, now, 'running');
 
   return info.lastInsertRowid as number;
 }
@@ -369,14 +403,7 @@ export function updateJobRun(
 ): void {
   const now = Date.now();
 
-  db.prepare(
-    'UPDATE job_runs SET finished_at = $finishedAt, status = $status, output = $output, error = $error, budget_used_msats = $budgetUsedMsats WHERE id = $runId',
-  ).run({
-    $finishedAt: now,
-    $status: status,
-    $output: output ?? null,
-    $error: error ?? null,
-    $budgetUsedMsats: budgetUsedMsats,
-    $runId: runId,
-  });
+  db.query(
+    'UPDATE job_runs SET finished_at = ?, status = ?, output = ?, error = ?, budget_used_msats = ? WHERE id = ?',
+  ).run(now, status, output ?? null, error ?? null, budgetUsedMsats, runId);
 }

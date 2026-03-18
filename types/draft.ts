@@ -33,7 +33,10 @@ export const CronJobDraftInputSchema = JobDraftBaseSchema.extend({
 
 export const OneTimeJobDraftInputSchema = JobDraftBaseSchema.extend({
   execution_type: z.literal('one-time'),
-  run_at: z.string().min(1).describe('ISO 8601 datetime string in UTC e.g. 2025-12-01T09:00:00Z'),
+  run_at: z
+    .string()
+    .min(1)
+    .describe('ISO 8601 datetime string in UTC e.g. 2025-12-01T09:00:00Z'),
 });
 
 export const JobDraftInputSchema = z.discriminatedUnion('execution_type', [
@@ -52,24 +55,28 @@ export const CronJobDraftPromptInputSchema = CronJobDraftInputSchema.pick({
   instructions: true,
 });
 
-export const OneTimeJobDraftPromptInputSchema = OneTimeJobDraftInputSchema.pick({
-  execution_type: true,
-  name: true,
-  prompt: true,
-  schedule_description: true,
-  run_at: true,
-  budget_sats: true,
-  instructions: true,
-});
+export const OneTimeJobDraftPromptInputSchema = OneTimeJobDraftInputSchema.pick(
+  {
+    execution_type: true,
+    name: true,
+    prompt: true,
+    schedule_description: true,
+    run_at: true,
+    budget_sats: true,
+    instructions: true,
+  },
+);
 
-export const JobDraftPromptInputSchema = z.discriminatedUnion('execution_type', [
-  CronJobDraftPromptInputSchema,
-  OneTimeJobDraftPromptInputSchema,
-]);
+export const JobDraftPromptInputSchema = z.discriminatedUnion(
+  'execution_type',
+  [CronJobDraftPromptInputSchema, OneTimeJobDraftPromptInputSchema],
+);
 
 export type JobDraftPromptInput = z.infer<typeof JobDraftPromptInputSchema>;
 
 export type JobInput = z.infer<typeof JobDraftBaseSchema>;
-export type CronJobDraftInput = JobInput & z.infer<typeof CronJobDraftInputSchema>;
-export type OneTimeJobDraftInput = JobInput & z.infer<typeof OneTimeJobDraftInputSchema>;
+export type CronJobDraftInput = JobInput &
+  z.infer<typeof CronJobDraftInputSchema>;
+export type OneTimeJobDraftInput = JobInput &
+  z.infer<typeof OneTimeJobDraftInputSchema>;
 export type JobDraftInput = CronJobDraftInput | OneTimeJobDraftInput;

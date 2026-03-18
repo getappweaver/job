@@ -4,7 +4,12 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 
-import type { PluginContext, PluginDefaults, PluginIdentity, RunAgentFn } from '@src/core/plugin';
+import type {
+  PluginContext,
+  PluginDefaults,
+  PluginIdentity,
+  RunAgentFn,
+} from '@src/core/plugin';
 
 import { storeDraft } from './drafts';
 import type { JobDraftInput } from './types';
@@ -34,7 +39,11 @@ export function getCurrentTimeContext(): {
 // JSON schema for prompt-only draft input (used in prompts)
 // ---------------------------------------------------------------------------
 
-const CREATE_JOB_JSON_SCHEMA = JSON.stringify(z.toJSONSchema(JobDraftPromptInputSchema), null, 2);
+const CREATE_JOB_JSON_SCHEMA = JSON.stringify(
+  z.toJSONSchema(JobDraftPromptInputSchema),
+  null,
+  2,
+);
 
 // ---------------------------------------------------------------------------
 // System prompt for creating a job from natural language
@@ -76,11 +85,14 @@ ${CREATE_JOB_JSON_SCHEMA}
 // ---------------------------------------------------------------------------
 
 type ReviseEntry = {
-  draftInput: JobDraftInput;
+  input: JobDraftInput;
   originalPrompt: string;
 };
 
-export function buildRevisePrompt(entry: ReviseEntry, corrections: string): string {
+export function buildRevisePrompt(
+  entry: ReviseEntry,
+  corrections: string,
+): string {
   const tc = getCurrentTimeContext();
 
   return `You are revising a scheduled job configuration.
@@ -92,7 +104,7 @@ Current date and time (UTC): ${tc.nowUtc}
 User's timezone: ${tc.timeZone}
 Use this when the correction involves time (e.g. "30 minutes later", "tomorrow at 5pm").
 
-Current parameters (JSON): ${JSON.stringify(entry.draftInput)}
+Current parameters (JSON): ${JSON.stringify(entry.input)}
 
 Output ONLY a single JSON object matching this schema. Apply the user's correction. No markdown, no code fence.
 
@@ -106,7 +118,10 @@ ${CREATE_JOB_JSON_SCHEMA}
 // Format draft preview (create / revise)
 // ---------------------------------------------------------------------------
 
-export function formatCreateWithPreview(id: string, input: JobDraftInput): string {
+export function formatCreateWithPreview(
+  id: string,
+  input: JobDraftInput,
+): string {
   const w = 19;
 
   const common = [
@@ -165,7 +180,9 @@ export async function generateCreateWithParams({
   }
 
   if (!raw || raw === '(no output)') {
-    throw new Error('Model returned no text. Try again or use a different backend (e.g. cursor).');
+    throw new Error(
+      'Model returned no text. Try again or use a different backend (e.g. cursor).',
+    );
   }
 
   const stripped = raw
@@ -242,7 +259,7 @@ export async function handleJobAi({
 
   const draftId = storeDraft(pluginDb, {
     kind: 'create',
-    draftInput,
+    input: draftInput,
     originalPrompt: userPrompt,
   });
 
