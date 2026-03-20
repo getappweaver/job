@@ -74,6 +74,10 @@ export async function handleJob({
   // ai — forward to handleJobAi (called from init handler before dispatch)
   // -------------------------------------------------------------------------
   if (sub === 'ai') {
+    if (!ctx.runAgent) {
+      return `${cmd} ai requires an agent backend. Set backend (e.g. !backend opencode-sdk) and try again.`;
+    }
+
     const { handleJobAi } = await import('./ai');
 
     return handleJobAi({
@@ -171,6 +175,10 @@ export async function handleJob({
   // revise
   // -------------------------------------------------------------------------
   if (sub === 'revise') {
+    if (!ctx.runAgent) {
+      return `${cmd} revise requires an agent backend. Set backend (e.g. !backend opencode-sdk) and try again.`;
+    }
+
     if (!draftOrJobId) {
       return `Usage: ${cmd} revise <draft_id> <corrections>`;
     }

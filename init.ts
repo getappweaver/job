@@ -1,9 +1,9 @@
 // ---------------------------------------------------------------------------
 // plugins/job/init.ts — JobPlugin definition
 // ---------------------------------------------------------------------------
-import { basename, join } from 'path';
+import { basename } from 'path';
 
-import { Database } from 'bun:sqlite';
+import type { Database } from 'bun:sqlite';
 
 import {
   parsePluginPackageJson,
@@ -12,8 +12,7 @@ import {
 } from '@src/core/plugin';
 
 import { handleJob } from './commands';
-import { createJobTables } from './db';
-import { createJobDraftsTable } from './drafts';
+import { openDb } from './db';
 import { startJobTicker } from './engine';
 
 const pluginDir = import.meta.dir;
@@ -57,13 +56,9 @@ export const JobPlugin: BotPlugin = {
   onInit: (ctx: PluginContext) => {
     JobPluginContext = ctx;
 
-    JobPluginDb = new Database(join(pluginDir, 'db.sqlite'), {
-      strict: true,
-    });
-
-    createJobTables(JobPluginDb);
-    createJobDraftsTable(JobPluginDb);
-    startJobTicker(JobPluginDb);
+    const db = openDb();
+    JobPluginDb = db;
+    startJobTicker(db);
   },
   helpText: (alias: string) => [
     `!${alias} ai <prompt>              — create a job draft from natural language`,

@@ -1,6 +1,9 @@
-import type { Database } from 'bun:sqlite';
+import { join } from 'path';
+
+import { Database } from 'bun:sqlite';
 import { Cron } from 'croner';
 
+import { createJobDraftsTable } from './drafts';
 import {
   CronJobSchema,
   JobBaseSchema,
@@ -406,4 +409,18 @@ export function updateJobRun(
   db.query(
     'UPDATE job_runs SET finished_at = ?, status = ?, output = ?, error = ?, budget_used_msats = ? WHERE id = ?',
   ).run(now, status, output ?? null, error ?? null, budgetUsedMsats, runId);
+}
+
+// ---------------------------------------------------------------------------
+// DB opener (single source of truth for CLI + plugins)
+// ---------------------------------------------------------------------------
+
+export function openDb(): Database {
+  const db = new Database(join(import.meta.dir, 'db.sqlite'), { strict: true });
+  db.run('PRAGMA foreign_keys = ON');
+  db.run('PRAGMA journal_mode=WAL');
+  createJobTables(db);
+  createJobDraftsTable(db);
+
+  return db;
 }

@@ -4,16 +4,54 @@
 import type { Database } from 'bun:sqlite';
 import { z } from 'zod';
 
+import { getOutputString } from '@src/backends/types';
 import type {
   PluginContext,
   PluginDefaults,
   PluginIdentity,
   RunAgentFn,
 } from '@src/core/plugin';
+import {
+  getAgentBackend,
+  getCurrentOrDefaultMode,
+  getModelOverride,
+  getProviderName,
+  getWorkspaceTarget,
+  openCoreDb,
+} from '@src/db';
 
+import { getJob, listJobs } from './db';
 import { storeDraft } from './drafts';
 import type { JobDraftInput } from './types';
 import { JobDraftInputSchema, JobDraftPromptInputSchema } from './types';
+
+const JobListCallSchema = z.object({
+  type: z.literal('list'),
+});
+
+const JobShowCallSchema = z.object({
+  type: z.literal('show'),
+  input: z.object({
+    id: z.number().int().positive(),
+  }),
+});
+
+const JobCreateCallSchema = z.object({
+  type: z.literal('create'),
+  input: JobDraftPromptInputSchema,
+  original_prompt: z.string(),
+});
+
+const JobToolCallSchema = z.discriminatedUnion('type', [
+  JobListCallSchema,
+  JobShowCallSchema,
+  JobCreateCallSchema,
+]);
+
+type JobToolCall = z.infer<typeof JobToolCallSchema>;
+
+export { JobToolCallSchema as ToolCallSchema };
+export const skillDescription = 'Job scheduling via local dm-bot CLI tools.';
 
 // ---------------------------------------------------------------------------
 // Time context for prompts
@@ -173,11 +211,12 @@ export async function generateCreateWithParams({
   }
 
   const result = await runAgent(systemPrompt);
-  const raw = result.output.trim();
 
   if (result.type === 'error') {
     throw new Error(result.output);
   }
+
+  const raw = getOutputString(result).trim();
 
   if (!raw || raw === '(no output)') {
     throw new Error(
@@ -265,3 +304,162 @@ export async function handleJobAi({
 
   return formatCreateWithPreview(String(draftId), draftInput);
 }
+
+function formatNextRun(nextRunAt: number | null): string {
+  if (nextRunAt == null) {
+    return '—';
+  }
+
+  return new Date(nextRunAt).toLocaleString(undefined, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function formatContextLine(props: {
+  backend: string;
+  provider: string;
+  model: string;
+  mode: string;
+}): string {
+  const { backend, provider, model, mode } = props;
+
+  return [backend, provider, model || '—', mode].join(' / ');
+}
+
+type ScheduleColProps = {
+  executionType: 'cron' | 'one-time';
+  scheduleDescription: string;
+  maxRuns: number | null;
+};
+
+function scheduleCol({
+  executionType,
+  scheduleDescription,
+  maxRuns,
+}: ScheduleColProps): string {
+  if (executionType === 'cron') {
+    return maxRuns != null
+      ? `${scheduleDescription} (max ${maxRuns})`
+      : scheduleDescription;
+  }
+
+  return `${scheduleDescription} (once)`;
+}
+
+function formatJobSummaryList(db: Database): string {
+  const jobs = listJobs(db);
+
+  if (jobs.length === 0) {
+    return 'No jobs.';
+  }
+
+  const escapeCell = (s: string): string => s.replace(/\|/g, '\\|');
+  const header = '| ID | En | Name | Schedule | Next Run | Context |';
+  const sep = '| --- | --- | --- | --- | --- | --- |';
+
+  const rows = jobs.map((job) => {
+    return `| ${escapeCell(String(job.id))} | ${job.enabled ? '✓' : '—'} | ${escapeCell(job.name)} | ${escapeCell(scheduleCol({ executionType: job.execution_type, scheduleDescription: job.schedule_description, maxRuns: job.max_runs ?? null }))} | ${escapeCell(formatNextRun(job.next_run_at))} | ${escapeCell(formatContextLine({ backend: job.backend, provider: job.provider, model: job.model, mode: job.mode }))} |`;
+  });
+
+  return `## Jobs\n\n${[header, sep, ...rows].join('\n')}`;
+}
+
+function formatJobDetail(db: Database, id: number): string {
+  const job = getJob(db, id);
+
+  if (!job) {
+    return `Job not found: ${id}`;
+  }
+
+  const scheduleLine =
+    job.execution_type === 'cron'
+      ? `Schedule: ${job.schedule}${job.max_runs != null ? ` (max ${job.max_runs} runs)` : ''}`
+      : `Run at: ${job.run_at != null ? formatNextRun(job.run_at) : '—'} (once)`;
+
+  const lines = [
+    `ID: ${job.id}`,
+    `Name: ${job.name}`,
+    `Type: ${job.execution_type}`,
+    scheduleLine,
+    `When: ${job.schedule_description}`,
+    `Prompt: ${job.prompt.slice(0, 80)}${job.prompt.length > 80 ? '…' : ''}`,
+    `Enabled: ${job.enabled ? 'yes' : 'no'}`,
+    `Next run: ${formatNextRun(job.next_run_at)}`,
+    `Backend: ${job.backend}`,
+    `Provider: ${job.provider}`,
+    `Model: ${job.model || '(default)'}`,
+    `Mode: ${job.mode}`,
+    `Budget: ${job.budget_sats != null ? `${job.budget_sats} sats (auto-flow)` : '—'}`,
+    `Instructions: ${job.instructions != null ? job.instructions.slice(0, 120) + (job.instructions.length > 120 ? '…' : '') : '—'}`,
+  ];
+
+  return lines.join('\n');
+}
+
+export function agentInstructions(alias: string): string {
+  return `## Job (${alias} tools)
+
+Use \`list\` and \`show\` for read-only inspection.
+Use \`create\` to propose a new job draft.
+
+For mutating calls, include \`original_prompt\` at the top level with the user request verbatim.
+
+After create returns a draft, apply it with:
+- \`!${alias} confirm <draft_id>\`
+- \`!${alias} revise <draft_id> <corrections>\`
+- \`!${alias} discard <draft_id>\`
+`;
+}
+
+export async function executeTool({
+  alias: _alias,
+  call,
+  db,
+}: {
+  alias: string;
+  call: JobToolCall;
+  db: Database;
+}): Promise<string> {
+  switch (call.type) {
+    case 'list':
+      return formatJobSummaryList(db);
+    case 'show':
+      return formatJobDetail(db, call.input.id);
+    case 'create': {
+      const coreDb = openCoreDb();
+
+      try {
+        const defaults: PluginDefaults = {
+          backend: getAgentBackend(coreDb),
+          provider: getProviderName(coreDb),
+          model: getModelOverride(coreDb),
+          mode: getCurrentOrDefaultMode(coreDb),
+          workspace_target: getWorkspaceTarget(coreDb),
+        };
+
+        const fullInput = JobDraftInputSchema.parse({
+          ...call.input,
+          ...defaults,
+          model: defaults.model ?? '',
+        });
+
+        const draftId = storeDraft(db, {
+          kind: 'create',
+          input: fullInput,
+          originalPrompt: call.original_prompt,
+        });
+
+        return formatCreateWithPreview(String(draftId), fullInput);
+      } finally {
+        coreDb.close();
+      }
+    }
+  }
+}
+
+// Re-export so CLI can open the plugin DB without importing init/bot wiring.
+export { openDb } from './db';
