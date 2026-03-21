@@ -50,6 +50,8 @@ export async function runJob({
   let success: boolean;
 
   try {
+    const agentEnv = ctx.getAgentEnv();
+
     const backend = createBackend({
       backendName: job.backend,
       dmBotRoot: dmBotRoot,
@@ -62,7 +64,7 @@ export async function runJob({
     const sessionId =
       job.execution_type === 'cron' && job.session_id != null
         ? job.session_id
-        : await backend.createSession({ cwd: dmBotRoot, env: ctx.env });
+        : await backend.createSession({ cwd: dmBotRoot, env: agentEnv });
 
     const cwd =
       job.workspace_target === 'bot' ? dmBotRoot : join(dmBotRoot, '..');
@@ -72,7 +74,7 @@ export async function runJob({
       content: effectiveContent,
       mode: job.mode,
       cwd,
-      env: ctx.env,
+      env: agentEnv,
       modelOverride: job.model,
     });
 

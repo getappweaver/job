@@ -61,6 +61,9 @@ export const JobPlugin: BotPlugin = {
     startJobTicker(db);
   },
   helpText: (alias: string) => [
+    `Jobs: one-time future tasks or recurring schedules (cron-style), with enable/disable, run history, and manual runs. Use !${alias} ai for natural-language job drafts (confirm/discard/revise); use list, show, run, and enable/disable for control.`,
+    '',
+    `!${alias} help — this message`,
     `!${alias} ai <prompt>              — create a job draft from natural language`,
     `!${alias} drafts                   — list pending drafts`,
     `!${alias} confirm <draft_id>       — create job from a draft`,

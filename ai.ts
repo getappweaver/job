@@ -433,10 +433,12 @@ export async function executeTool({
       const coreDb = openCoreDb();
 
       try {
+        const backendName = getAgentBackend(coreDb);
+
         const defaults: PluginDefaults = {
-          backend: getAgentBackend(coreDb),
+          backend: backendName,
           provider: getProviderName(coreDb),
-          model: getModelOverride(coreDb),
+          model: getModelOverride(coreDb, backendName),
           mode: getCurrentOrDefaultMode(coreDb),
           workspace_target: getWorkspaceTarget(coreDb),
         };
