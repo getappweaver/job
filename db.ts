@@ -388,12 +388,12 @@ export function insertJobRun(db: Database, jobId: number): number {
   const now = Date.now();
 
   const info = db
-    .query(
-      'INSERT INTO job_runs (job_id, started_at, finished_at, status, output, error) VALUES (?, ?, NULL, ?, NULL, NULL)',
+    .prepare(
+      'INSERT INTO job_runs (job_id, started_at, finished_at, status, output, error) VALUES ($jobId, $startedAt, NULL, $status, NULL, NULL)',
     )
-    .run(jobId, now, 'running');
+    .run({ jobId, startedAt: now, status: 'running' });
 
-  return info.lastInsertRowid as number;
+  return Number(info.lastInsertRowid);
 }
 
 export function updateJobRun(
@@ -406,9 +406,16 @@ export function updateJobRun(
 ): void {
   const now = Date.now();
 
-  db.query(
-    'UPDATE job_runs SET finished_at = ?, status = ?, output = ?, error = ?, budget_used_msats = ? WHERE id = ?',
-  ).run(now, status, output ?? null, error ?? null, budgetUsedMsats, runId);
+  db.prepare(
+    'UPDATE job_runs SET finished_at = $finishedAt, status = $status, output = $output, error = $error, budget_used_msats = $budgetUsedMsats WHERE id = $id',
+  ).run({
+    finishedAt: now,
+    status,
+    output,
+    error,
+    budgetUsedMsats,
+    id: runId,
+  });
 }
 
 // ---------------------------------------------------------------------------

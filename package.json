@@ -6,6 +6,9 @@
     "description": "Scheduled job management plugin for dm-bot"
   },
   "type": "module",
+  "scripts": {
+    "contrib:setup": "chmod +x ../../scripts/commit-msg ../../scripts/post-commit ../../scripts/ngit-helper.sh && git config core.hooksPath ../../scripts"
+  },
   "dependencies": {
     "croner": "^8.0.0",
     "zod": "^4.3.6"
