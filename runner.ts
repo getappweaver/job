@@ -15,6 +15,7 @@ import { log } from '@src/logger';
 import { dmBotRoot } from '@src/paths';
 
 import {
+  disableJob,
   getJobRunCount,
   getNextRunAt,
   insertJobRun,
@@ -41,17 +42,29 @@ export async function runJob({
   const runId = insertJobRun(pluginDb, job.id);
   const startedAt = Date.now();
 
+  const executionPreamble = [
+    'You are executing a scheduled job right now.',
+    'This is not a request to create, plan, or reschedule a job.',
+    'Perform the requested task immediately using the schedule context below.',
+    'If it is a reminder, send the reminder message directly as if it is due now.',
+    'Do not ask clarifying questions about timing or scheduling.',
+    'Be concise and action-oriented.',
+    '',
+    `Job name: ${job.name}`,
+    `Execution type: ${job.execution_type}`,
+    `Scheduled as: ${job.schedule_description}`,
+    `Current time: ${new Date(startedAt).toISOString()}`,
+  ].join('\n');
+
   const effectiveContent =
     job.instructions != null && job.instructions.trim().length > 0
-      ? `Instructions:\n${job.instructions}\n\nJob:\n${job.prompt}`
-      : job.prompt;
+      ? `${executionPreamble}\n\nAdditional instructions:\n${job.instructions}\n\nJob request:\n${job.prompt}`
+      : `${executionPreamble}\n\nJob request:\n${job.prompt}`;
 
   let output: string;
   let success: boolean;
 
   try {
-    const agentEnv = ctx.getAgentEnv();
-
     const backend = createBackend({
       backendName: job.backend,
       dmBotRoot: dmBotRoot,
@@ -64,7 +77,7 @@ export async function runJob({
     const sessionId =
       job.execution_type === 'cron' && job.session_id != null
         ? job.session_id
-        : await backend.createSession({ cwd: dmBotRoot, env: agentEnv });
+        : await backend.createSession(dmBotRoot);
 
     const cwd =
       job.workspace_target === 'bot' ? dmBotRoot : join(dmBotRoot, '..');
@@ -74,8 +87,10 @@ export async function runJob({
       content: effectiveContent,
       mode: job.mode,
       cwd,
-      env: agentEnv,
+      getRoutstrSkKey: ctx.getRoutstrSkKey,
       modelOverride: job.model,
+      onAgentStreamChunk: null,
+      streamAbortSignal: null,
     });
 
     output = getOutputString(result);
@@ -88,7 +103,7 @@ export async function runJob({
     const errMsg = String(err);
 
     ctx
-      .sendReply(`[Job: ${job.name}]\nError: ${errMsg}`)
+      .sendDm(`[Job: ${job.name}]\nError: ${errMsg}`)
       .catch((e) => log.error(`Failed to send error reply: ${String(e)}`));
 
     updateJobRun(pluginDb, runId, 'error', null, errMsg, null);
@@ -102,7 +117,7 @@ export async function runJob({
   }
 
   ctx
-    .sendReply(`[Job: ${job.name}]\n${output || '(no output)'}`)
+    .sendDm(`[Job: ${job.name}]\n${output || '(no output)'}`)
     .catch((e) => log.error(`Failed to send reply: ${String(e)}`));
 
   updateJobRun(
@@ -113,6 +128,13 @@ export async function runJob({
     success ? null : output,
     null,
   );
+
+  if (success && job.execution_type === 'one-time') {
+    updateJobRunTimes(pluginDb, job.id, startedAt, null);
+    disableJob(pluginDb, job.id);
+
+    return;
+  }
 
   const runCount = getJobRunCount(pluginDb, job.id);
   const nextRunAt = getNextRunAt(job, startedAt, runCount);

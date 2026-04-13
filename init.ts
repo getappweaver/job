@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
-// plugins/job/init.ts — JobPlugin definition
+// plugins/job/init.ts — JobPlugin (command system v2)
 // ---------------------------------------------------------------------------
+
 import { basename } from 'path';
 
 import type { Database } from 'bun:sqlite';
@@ -11,9 +12,10 @@ import {
   type PluginContext,
 } from '@src/core/plugin';
 
-import { handleJob } from './commands';
+import { handleJob } from './adapter';
 import { openDb } from './db';
 import { startJobTicker } from './engine';
+import { getJobCommandDefinition, getJobHelpLines } from './help';
 
 const pluginDir = import.meta.dir;
 const alias = basename(pluginDir);
@@ -36,7 +38,7 @@ export const JobPlugin: BotPlugin = {
     version: jobPkg.version,
     description: jobPkg.description,
   },
-  handler: (args: string[]) => {
+  handler: async (args, context) => {
     if (!JobPluginContext) {
       throw new Error('JobPlugin not initialized');
     }
@@ -47,10 +49,11 @@ export const JobPlugin: BotPlugin = {
 
     return handleJob({
       args,
+      prefix: context.prefix,
+      alias,
+      db: JobPluginDb,
+      ctx: { ...JobPluginContext, runAgent: context.runAgent },
       identity: JobPlugin.identity,
-      helpText: JobPlugin.helpText,
-      pluginDb: JobPluginDb,
-      ctx: JobPluginContext,
     });
   },
   onInit: (ctx: PluginContext) => {
@@ -60,21 +63,12 @@ export const JobPlugin: BotPlugin = {
     JobPluginDb = db;
     startJobTicker(db);
   },
-  helpText: (alias: string) => [
-    `Jobs: one-time future tasks or recurring schedules (cron-style), with enable/disable, run history, and manual runs. Use !${alias} ai for natural-language job drafts (confirm/discard/revise); use list, show, run, and enable/disable for control.`,
+  helpText: (a: string, prefix: string) => [
+    `Jobs: one-time future tasks or recurring schedules (cron-style), with enable/disable, run history, and manual runs. Use ${prefix}${a} ai for natural-language job drafts (confirm/discard/revise); use list, show, run, and enable/disable for control.`,
     '',
-    `!${alias} help — this message`,
-    `!${alias} ai <prompt>              — create a job draft from natural language`,
-    `!${alias} drafts                   — list pending drafts`,
-    `!${alias} confirm <draft_id>       — create job from a draft`,
-    `!${alias} revise <draft_id> <text> — ask AI to revise draft params`,
-    `!${alias} discard <draft_id>       — discard a draft`,
-    `!${alias} list                     — list all jobs`,
-    `!${alias} show <id>                — show job details`,
-    `!${alias} enable <id>              — enable a job`,
-    `!${alias} disable <id>             — disable a job`,
-    `!${alias} delete <id>              — delete a job`,
-    `!${alias} history <id> [N]         — show run history (default N=10)`,
-    `!${alias} run <id>                 — run job once now`,
+    `${prefix}${a} help [topic] — detailed help for a subcommand`,
+    ...getJobHelpLines(prefix, a),
   ],
+  commandDefinition: (prefix: string, pluginAlias: string) =>
+    getJobCommandDefinition(prefix, pluginAlias),
 };
