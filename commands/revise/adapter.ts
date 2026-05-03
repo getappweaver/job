@@ -1,10 +1,4 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginContext, PluginIdentity } from '@src/core/plugin';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
-import { jobReplyMessage } from '../adapter-util';
+import type { JobCommandAdapterParams } from '../../types';
 
 import { handleReviseCommand } from './handler';
 
@@ -20,15 +14,9 @@ function toCorrectionText(value: unknown): string {
   return String(value);
 }
 
-export async function adaptReviseCommand(params: {
-  prefix: string;
-  alias: string;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-  db: Database;
-  ctx: PluginContext;
-  identity: PluginIdentity;
-}) {
+export async function adaptReviseCommand(
+  params: JobCommandAdapterParams,
+): Promise<string> {
   const rawId = params.parsed.arguments.draftId;
 
   const draftIdRaw =
@@ -46,9 +34,5 @@ export async function adaptReviseCommand(params: {
     corrections,
   });
 
-  return jobReplyMessage({
-    alias: params.alias,
-    subcommand: 'revise',
-    text,
-  });
+  return text;
 }

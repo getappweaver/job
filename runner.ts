@@ -68,7 +68,8 @@ export async function runJob({
     const backend = createBackend({
       backendName: job.backend,
       dmBotRoot: dmBotRoot,
-      mode: job.mode,
+      cursorMode: job.mode,
+      opencodeAgentName: job.backend === 'opencode' ? job.mode : null,
       attachUrl: null,
       modelOverride: job.model,
       providerName: job.provider,
@@ -85,7 +86,8 @@ export async function runJob({
     const result = await backend.runMessage({
       sessionId,
       content: effectiveContent,
-      mode: job.mode,
+      cursorMode: job.mode,
+      opencodeAgentName: job.backend === 'opencode' ? job.mode : null,
       cwd,
       getRoutstrSkKey: ctx.getRoutstrSkKey,
       modelOverride: job.model,

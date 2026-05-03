@@ -10,4 +10,12 @@ export const listDefinition = (
   arguments: [],
   options: [],
   examples: [`${prefix}${alias} list`],
+  webWidget: {
+    placement: 'header',
+    surface: 'timeline_singleton',
+    label: 'Jobs',
+    modalTitle: 'Jobs',
+    icon: '/plugins/job/commands/list/renderers/clock.svg',
+    order: 30,
+  },
 });

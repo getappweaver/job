@@ -1,22 +1,8 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginContext, PluginIdentity } from '@src/core/plugin';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
-import { jobReplyMessage } from '../adapter-util';
+import type { JobCommandAdapterParams } from '../../types';
 
 import { handleHistoryCommand } from './handler';
 
-export function adaptHistoryCommand(params: {
-  prefix: string;
-  alias: string;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-  db: Database;
-  ctx: PluginContext;
-  identity: PluginIdentity;
-}) {
+export function adaptHistoryCommand(params: JobCommandAdapterParams): string {
   const rawId = params.parsed.arguments.id;
 
   const idRaw = rawId === undefined || rawId === null ? null : String(rawId);
@@ -36,9 +22,5 @@ export function adaptHistoryCommand(params: {
     limitRaw,
   });
 
-  return jobReplyMessage({
-    alias: params.alias,
-    subcommand: 'history',
-    text,
-  });
+  return text;
 }

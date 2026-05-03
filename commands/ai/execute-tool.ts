@@ -21,6 +21,7 @@ import type { Job } from '../../types';
 import { JobDraftInputSchema } from '../../types';
 
 import { formatCreateWithPreview } from './format-preview';
+import { getCurrentTimeContext } from './prompts';
 import type { JobToolCall } from './schemas';
 
 function formatNextRunLocal(nextRunAt: number | null): string {
@@ -93,20 +94,34 @@ function formatJobDetail(db: Database, id: number): string {
   return lines.join('\n');
 }
 
+function formatCurrentTimeContext(): string {
+  const tc = getCurrentTimeContext();
+
+  return [
+    `Current date and time (UTC): ${tc.nowUtc}`,
+    `Current date and time (user's timezone): ${tc.nowLocal}`,
+    `User's timezone: ${tc.timeZone}`,
+  ].join('\n');
+}
+
 export async function executeTool({
   alias,
   call,
   db,
+  prefix,
 }: {
   alias: string;
   call: JobToolCall;
   db: Database;
+  prefix: string;
 }): Promise<string> {
   switch (call.type) {
     case 'list':
       return formatJobSummaryList(db);
     case 'show':
       return formatJobDetail(db, call.input.id);
+    case 'context':
+      return formatCurrentTimeContext();
     case 'create': {
       const coreDb = openCoreDb();
 
@@ -137,7 +152,7 @@ export async function executeTool({
         return formatCreateWithPreview({
           draftId: String(draftId),
           input: fullInput,
-          prefix: '!',
+          prefix,
           alias,
         });
       } finally {

@@ -10,12 +10,15 @@ import {
   parsePluginPackageJson,
   type BotPlugin,
   type PluginContext,
+  type PluginInvocationContext,
 } from '@src/core/plugin';
 
 import { handleJob } from './adapter';
+import { aiDefinition } from './ai';
 import { openDb } from './db';
 import { startJobTicker } from './engine';
 import { getJobCommandDefinition, getJobHelpLines } from './help';
+import { jobStories } from './stories';
 
 const pluginDir = import.meta.dir;
 const alias = basename(pluginDir);
@@ -38,7 +41,7 @@ export const JobPlugin: BotPlugin = {
     version: jobPkg.version,
     description: jobPkg.description,
   },
-  handler: async (args, context) => {
+  handler: async (args: string[], context: PluginInvocationContext) => {
     if (!JobPluginContext) {
       throw new Error('JobPlugin not initialized');
     }
@@ -51,8 +54,14 @@ export const JobPlugin: BotPlugin = {
       args,
       prefix: context.prefix,
       alias,
+      source: context.source,
       db: JobPluginDb,
-      ctx: { ...JobPluginContext, runAgent: context.runAgent },
+      ctx: {
+        ...JobPluginContext,
+        runAgent: context.runAgent,
+        promptFn: context.promptFn ?? JobPluginContext.promptFn,
+        sendReply: context.sendReply ?? JobPluginContext.sendReply,
+      },
       identity: JobPlugin.identity,
     });
   },
@@ -69,6 +78,8 @@ export const JobPlugin: BotPlugin = {
     `${prefix}${a} help [topic] — detailed help for a subcommand`,
     ...getJobHelpLines(prefix, a),
   ],
+  aiDefinition,
   commandDefinition: (prefix: string, pluginAlias: string) =>
     getJobCommandDefinition(prefix, pluginAlias),
+  stories: jobStories,
 };

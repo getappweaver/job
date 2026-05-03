@@ -21,7 +21,7 @@ export async function handleReviseCommand(
   const cmd = `${prefix}${alias}`;
 
   if (!ctx.runAgent) {
-    return `${cmd} revise requires an agent backend. Set backend (e.g. !backend opencode-sdk) and try again.`;
+    return `${cmd} revise requires an agent backend. Set backend (e.g. !backend opencode) and try again.`;
   }
 
   if (!draftIdRaw) {

@@ -48,4 +48,7 @@ export function createJobTables(db: Database): void {
   );
 
   db.run('CREATE INDEX IF NOT EXISTS idx_job_runs_job_id ON job_runs(job_id)');
+
+  db.run("UPDATE jobs SET backend = 'cursor' WHERE backend = 'cursor-sdk'");
+  db.run("UPDATE jobs SET backend = 'opencode' WHERE backend = 'opencode-sdk'");
 }

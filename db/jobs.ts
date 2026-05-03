@@ -124,7 +124,9 @@ export function createJob(db: Database, input: JobDraftInput): Job {
 
 export function listJobs(db: Database): Job[] {
   const rows = db
-    .prepare('SELECT * FROM jobs ORDER BY next_run_at ASC')
+    .prepare(
+      'SELECT * FROM jobs ORDER BY enabled DESC, next_run_at ASC NULLS LAST, id ASC',
+    )
     .all() as Record<string, unknown>[];
 
   return rows.map(rowToJob);

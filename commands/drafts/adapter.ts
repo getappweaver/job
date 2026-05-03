@@ -1,22 +1,8 @@
-import type { Database } from 'bun:sqlite';
-
-import type { PluginContext, PluginIdentity } from '@src/core/plugin';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
-
-import { jobReplyMessage } from '../adapter-util';
+import type { JobCommandAdapterParams } from '../../types';
 
 import { handleDraftsCommand } from './handler';
 
-export function adaptDraftsCommand(params: {
-  prefix: string;
-  alias: string;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-  db: Database;
-  ctx: PluginContext;
-  identity: PluginIdentity;
-}) {
+export function adaptDraftsCommand(params: JobCommandAdapterParams): string {
   const text = handleDraftsCommand({
     prefix: params.prefix,
     alias: params.alias,
@@ -25,9 +11,5 @@ export function adaptDraftsCommand(params: {
     identity: params.identity,
   });
 
-  return jobReplyMessage({
-    alias: params.alias,
-    subcommand: 'drafts',
-    text,
-  });
+  return text;
 }

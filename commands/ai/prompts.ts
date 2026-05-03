@@ -6,6 +6,12 @@ import { z } from 'zod';
 
 import { type JobDraftInput, JobDraftPromptInputSchema } from '../../types';
 
+import {
+  buildJobCreationRulesSection,
+  buildJobInstructionsFieldRulesSection,
+  buildJobPayloadFieldRulesSection,
+} from './job-creation-rules';
+
 const CREATE_JOB_JSON_SCHEMA = JSON.stringify(
   z.toJSONSchema(JobDraftPromptInputSchema),
   null,
@@ -38,10 +44,15 @@ User request: "${userPrompt}"
 Current date and time (UTC): ${tc.nowUtc}
 Current date and time (user's timezone): ${tc.nowLocal}
 User's timezone: ${tc.timeZone}
-Use the current date/time above as the reference for relative times ("in 10 minutes", "tomorrow at 9am"). For one-time jobs, output run_at as an ISO 8601 date-time string in UTC (the instant in UTC, as a string; must be in the future). Interpret wall-clock times (e.g. "9am") in the user's timezone.
 
-Important: Do NOT include backend/provider/model/mode/workspace_target in the JSON output. Those are set by the system.
-Important: The job prompt should be written for execution time, not for job creation time. When the job runs later, the agent should be able to act immediately from the stored prompt without asking to schedule or confirm the reminder again.
+When turning the user's request into a job payload:
+${buildJobCreationRulesSection()}
+
+How to fill the job payload fields:
+${buildJobPayloadFieldRulesSection()}
+
+How to fill the optional instructions field:
+${buildJobInstructionsFieldRulesSection()}
 
 Output ONLY a single JSON object (no markdown, no code fence). You must choose exactly one of:
 

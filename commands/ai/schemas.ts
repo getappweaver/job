@@ -17,6 +17,10 @@ const JobShowCallSchema = z.object({
   }),
 });
 
+const JobContextCallSchema = z.object({
+  type: z.literal('context'),
+});
+
 const JobCreateCallSchema = z.object({
   type: z.literal('create'),
   input: JobDraftPromptInputSchema,
@@ -26,6 +30,7 @@ const JobCreateCallSchema = z.object({
 const JobToolCallSchema = z.discriminatedUnion('type', [
   JobListCallSchema,
   JobShowCallSchema,
+  JobContextCallSchema,
   JobCreateCallSchema,
 ]);
 

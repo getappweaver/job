@@ -1,5 +1,6 @@
 import type { Database } from 'bun:sqlite';
 
+import type { MessageSource } from '@src/messaging';
 import { PROMPT_SESSION_EXIT } from '@src/prompt-session';
 
 import type { BaseProps } from '../../command-context';
@@ -17,6 +18,7 @@ import type { JobDraftInput } from '../../types';
 import { formatCreateWithPreview } from './format-preview';
 import { generateCreateWithParams } from './generate';
 import { buildRevisePrompt } from './prompts';
+import { createJobDraftReviewPrompt } from './renderers/web';
 
 function formatDraftReview(params: {
   draft: JobDraftRow;
@@ -207,7 +209,7 @@ export async function applyDraftSessionAction(
 }
 
 export async function runDraftSessionInteractive(
-  props: BaseProps & { sessionId: string },
+  props: BaseProps & { sessionId: string; source: MessageSource },
 ): Promise<string> {
   let index = 0;
 
@@ -227,7 +229,14 @@ export async function runDraftSessionInteractive(
       return view;
     }
 
-    const answer = await props.ctx.promptFn(view);
+    const answer = await props.ctx.promptFn(
+      createJobDraftReviewPrompt({
+        source: props.source,
+        command: props.alias,
+        subcommand: 'ai',
+        text: view,
+      }),
+    );
 
     if (answer === PROMPT_SESSION_EXIT) {
       return `Session finished. Remaining drafts can be reviewed later with ${props.prefix}${props.alias} drafts.`;

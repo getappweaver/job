@@ -1,7 +1,9 @@
 import type { Database } from 'bun:sqlite';
 
 import type { PluginContext, PluginIdentity } from '@src/core/plugin';
+import type { MessageSource } from '@src/messaging';
 import { parseCliInput } from '@src/system/parser-cli';
+import type { WebNodeRoot } from '@src/web/ui-schema';
 
 import { adaptAiCommand } from './commands/ai/adapter';
 import { adaptConfirmCommand } from './commands/confirm/adapter';
@@ -17,8 +19,7 @@ import { adaptReviseCommand } from './commands/revise/adapter';
 import { adaptRunCommand } from './commands/run/adapter';
 import { adaptShowCommand } from './commands/show/adapter';
 import { getJobCommandDefinition } from './help';
-import { createMessageRepresentation } from './output/message/builder';
-import { renderJobCli, type JobCliRepresentation } from './renderers/cli';
+import type { JobCommandAdapterParams } from './types';
 
 type JobSubcommand =
   | 'help'
@@ -37,15 +38,9 @@ type JobSubcommand =
 
 type MaybePromise<T> = T | Promise<T>;
 
-type JobCommandAdapter = (params: {
-  prefix: string;
-  alias: string;
-  parsed: ReturnType<typeof parseCliInput>;
-  command: ReturnType<typeof getJobCommandDefinition>;
-  db: Database;
-  ctx: PluginContext;
-  identity: PluginIdentity;
-}) => MaybePromise<JobCliRepresentation>;
+type JobCommandAdapter = (
+  params: JobCommandAdapterParams,
+) => MaybePromise<string | WebNodeRoot>;
 
 const normalizedDefinitions = new Map<
   string,
@@ -109,27 +104,17 @@ export async function handleJob(params: {
   args: string[];
   prefix: string;
   alias: string;
+  source: MessageSource;
   db: Database;
   ctx: PluginContext;
   identity: PluginIdentity;
-}): Promise<string> {
+}): Promise<string | WebNodeRoot> {
   const normalizedArgs = params.args.length === 0 ? ['help'] : params.args;
   const subcommand = normalizedArgs[0]?.toLowerCase();
 
-  const commandNotFound = createMessageRepresentation({
-    command: params.alias,
-    subcommand: subcommand ?? 'unknown',
-    tone: 'error',
-    text: `Unknown command: ${params.prefix}${params.alias} ${subcommand ?? 'unknown'}`,
-  });
-
   if (!subcommand || !isJobSubcommand(subcommand)) {
-    return renderJobCli(commandNotFound, {
-      prefix: params.prefix,
-    });
+    return `Unknown command: ${params.prefix}${params.alias} ${subcommand ?? 'unknown'}`;
   }
-
-  let representation: JobCliRepresentation;
 
   try {
     const command = getNormalizedDefinition(params.prefix, params.alias);
@@ -142,38 +127,22 @@ export async function handleJob(params: {
     });
 
     if (!isJobSubcommand(parsed.subcommand)) {
-      return renderJobCli(commandNotFound, {
-        prefix: params.prefix,
-      });
+      return `Unknown command: ${params.prefix}${params.alias} ${parsed.subcommand}`;
     }
 
     const adapter = subcommandAdapters[parsed.subcommand];
 
-    if (!adapter) {
-      return renderJobCli(commandNotFound, {
-        prefix: params.prefix,
-      });
-    }
-
-    representation = await adapter({
+    return await adapter({
       prefix: params.prefix,
       alias: params.alias,
       parsed,
       command,
       db: params.db,
+      source: params.source,
       ctx: params.ctx,
       identity: params.identity,
     });
   } catch (err) {
-    representation = createMessageRepresentation({
-      command: params.alias,
-      subcommand: subcommand ?? 'unknown',
-      tone: 'error',
-      text: String(err instanceof Error ? err.message : err),
-    });
+    return String(err instanceof Error ? err.message : err);
   }
-
-  return renderJobCli(representation, {
-    prefix: params.prefix,
-  });
 }

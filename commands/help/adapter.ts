@@ -1,21 +1,9 @@
-import type { Database } from 'bun:sqlite';
-
 import { buildHelpSubcommandRepresentation } from '@src/commands/help/command';
-import type { PluginContext, PluginIdentity } from '@src/core/plugin';
-import type { CommandDefinition } from '@src/system/command-definition';
-import type { ParsedCliInvocation } from '@src/system/parser-cli';
+import { renderHelpText } from '@src/commands/help/renderers/text';
 
-import { createMessageRepresentation } from '../../output/message/builder';
+import type { JobCommandAdapterParams } from '../../types';
 
-export function adaptHelpCommand(params: {
-  prefix: string;
-  alias: string;
-  parsed: ParsedCliInvocation;
-  command: CommandDefinition;
-  db: Database;
-  ctx: PluginContext;
-  identity: PluginIdentity;
-}) {
+export function adaptHelpCommand(params: JobCommandAdapterParams): string {
   void params.db;
   void params.ctx;
   void params.identity;
@@ -28,13 +16,8 @@ export function adaptHelpCommand(params: {
   });
 
   if (result.type === 'error') {
-    return createMessageRepresentation({
-      command: params.alias,
-      subcommand: 'help',
-      tone: 'error',
-      text: result.message,
-    });
+    return result.message;
   }
 
-  return result.representation;
+  return renderHelpText(result.representation, { prefix: params.prefix });
 }
