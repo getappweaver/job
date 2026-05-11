@@ -81,7 +81,7 @@ export async function runJob({
         : await backend.createSession(dmBotRoot);
 
     const cwd =
-      job.workspace_target === 'bot' ? dmBotRoot : join(dmBotRoot, '..');
+      job.workspace_target === 'appweaver' ? dmBotRoot : join(dmBotRoot, '..');
 
     const result = await backend.runMessage({
       sessionId,

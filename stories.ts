@@ -30,7 +30,7 @@ const scheduledJob = {
   provider: 'local',
   model: 'default',
   mode: 'agent',
-  workspace_target: 'bot',
+  workspace_target: 'appweaver',
   budget_sats: null,
   instructions:
     'Keep the brief actionable and include only items that can be started today.',
