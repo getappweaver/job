@@ -2,8 +2,8 @@
 // plugins/job/db/row-map.ts — SQLite row → Job / JobRun
 // ---------------------------------------------------------------------------
 
-import type { ProviderName } from '@src/db';
-import { ProviderNameSchema } from '@src/db';
+import type { ProviderName, WorkspaceTarget } from '@src/db';
+import { ProviderNameSchema, WorkspaceTargetSchema } from '@src/db';
 
 import {
   CronJobSchema,
@@ -23,6 +23,14 @@ function coerceStoredProvider(raw: unknown): ProviderName {
   return parsed.success ? parsed.data : 'local';
 }
 
+/** DB may contain empty or legacy values; JobBaseSchema requires parent|appweaver. */
+function coerceStoredWorkspaceTarget(raw: unknown): WorkspaceTarget {
+  const s = String(raw ?? '').trim();
+  const parsed = WorkspaceTargetSchema.safeParse(s.length > 0 ? s : undefined);
+
+  return parsed.success ? parsed.data : 'parent';
+}
+
 export function rowToJob(row: Record<string, unknown>): Job {
   const commonRaw = {
     id: Number(row.id),
@@ -38,7 +46,7 @@ export function rowToJob(row: Record<string, unknown>): Job {
     provider: coerceStoredProvider(row.provider),
     model: String(row.model ?? ''),
     mode: String(row.mode ?? ''),
-    workspace_target: String(row.workspace_target ?? ''),
+    workspace_target: coerceStoredWorkspaceTarget(row.workspace_target),
     budget_sats: row.budget_sats != null ? Number(row.budget_sats) : null,
     instructions: row.instructions != null ? String(row.instructions) : null,
   };

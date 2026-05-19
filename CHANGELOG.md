@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v4.0.0] - 2026-05-19
+
+- fix: coerce stored workspace targets (d0e3757)
+
 ## [v3.0.1] - 2026-05-11
 
-- fix: update job workspace target name (77b0c0f)
+- fix: update job workspace target name (b778b71)
 
 ## [v3.0.0] - 2026-05-03
 
