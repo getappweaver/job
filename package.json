@@ -1,7 +1,8 @@
 {
   "name": "appweaver-job-plugin",
-  "version": "4.0.1",
+  "version": "4.0.2",
   "dmBot": {
+    "title": "Job scheduler",
     "coreApiVersion": "^9.18.0",
     "description": "Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace."
   },
