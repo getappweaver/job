@@ -1,10 +1,11 @@
 {
-  "name": "dm-bot-job-plugin",
-  "version": "4.0.0",
+  "name": "appweaver-job-plugin",
+  "version": "4.0.1",
   "dmBot": {
     "coreApiVersion": "^9.18.0",
-    "description": "Scheduled job management plugin for dm-bot"
+    "description": "Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace."
   },
+  "description": "Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace.",
   "type": "module",
   "scripts": {
     "contrib:setup": "chmod +x ../../scripts/commit-msg ../../scripts/post-commit ../../scripts/ngit-helper.sh && git config core.hooksPath ../../scripts"
