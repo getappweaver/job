@@ -229,6 +229,22 @@ export function renderListWeb(params: {
     kind: 'ui',
     version: 1,
     meta: { command: params.command, subcommand: 'list' },
+    widgetHelp: {
+      title: 'Job scheduler',
+      body: [
+        'Schedule recurring or one-time tasks by giving natural prompts like "Remind me of a meeting on Monday morning."',
+      ],
+      stories: [
+        {
+          id: 'job-schedule-ai',
+          title: 'Schedule a recurring agent job',
+          description:
+            'Use the Jobs widget AI prompt to draft and confirm a recurring agent workflow.',
+          pluginAlias: params.command,
+          iconUrl: '/plugin-icons/job/commands__list__renderers__clock.svg',
+        },
+      ],
+    },
     tree: stack([
       buildListAiCommandForm(params.command),
       ...(params.jobs.length === 0
