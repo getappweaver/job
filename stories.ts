@@ -4,7 +4,7 @@ import type {
 } from '@src/system/story-definition';
 import { draftReviewPrompt } from '@src/web/widgets';
 
-import { renderListWeb } from './commands/list/renderers/web';
+import { renderJobListComponent } from './commands/list/component';
 import type { Job } from './types';
 
 type JobStoryState = {
@@ -67,7 +67,7 @@ function buildJobListStoryCommandOutput(params: {
 }): NonNullable<StoryDefinition<JobStoryState>['commandOutput']> {
   return {
     text: null,
-    web: renderListWeb({
+    web: renderJobListComponent({
       command: params.alias,
       prefix: params.prefix,
       jobs: params.jobs,

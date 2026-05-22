@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v4.0.5] - 2026-05-23
+
+- refactor: share job list component (b01ddfb)
+
 ## [v4.0.4] - 2026-05-21
 
-- feat: add job widget help (8f9dd8d)
+- feat: add job widget help (73732db)
 
 ## [v4.0.3] - 2026-05-20
 
