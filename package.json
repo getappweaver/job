@@ -1,6 +1,6 @@
 {
   "name": "appweaver-job-plugin",
-  "version": "4.0.5",
+  "version": "4.0.6",
   "appweaver": {
     "title": "Job scheduler",
     "icon": "./commands/list/renderers/clock.svg",
