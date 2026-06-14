@@ -1,11 +1,11 @@
 {
   "name": "appweaver-job-plugin",
-  "version": "4.0.6",
+  "version": "4.1.0",
   "appweaver": {
     "title": "Job scheduler",
     "icon": "./commands/list/renderers/clock.svg",
     "website": "https://github.com/getappweaver/job",
-    "coreApiVersion": "^9.18.0",
+    "coreApiVersion": "^9.41.0",
     "description": "Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace."
   },
   "description": "Official AppWeaver Job scheduler. Adds focused AI-powered job scheduling tools, commands, and data models to an AppWeaver workspace.",

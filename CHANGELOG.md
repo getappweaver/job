@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v4.1.0] - 2026-06-14
+
+- chore: require story-capable core (1eac4f0)
+
 ## [v4.0.6] - 2026-05-23
 
-- docs: add demo links (9dc1e62)
+- docs: add demo links (044f5ad)
 
 ## [v4.0.5] - 2026-05-23
 

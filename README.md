@@ -8,7 +8,7 @@ Scheduled job management: cron and one-time jobs, drafts, and AI-assisted creati
 
 [Interactive Demo](https://getappweaver.com/job-scheduler)
 
-![Job scheduler screenshot](https://getappweaver.com/screenshots/job.png)
+![Schedule a job with AI on mobile](https://getappweaver.com/gifs/file-job-ai-mobile.gif)
 
 ## Commands
 
