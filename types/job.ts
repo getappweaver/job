@@ -14,9 +14,35 @@ import {
 
 export const JobExecutionTypeSchema = z.enum(['cron', 'one-time']);
 export const JobRunStatusSchema = z.enum(['running', 'success', 'error']);
+export const JobRunTriggerSchema = z.enum(['scheduled', 'manual', 'retry']);
+export const JobRunLogLevelSchema = z.enum(['info', 'success', 'error']);
+
+export const JobRunLogEventSchema = z.enum([
+  'run_started',
+  'session_created',
+  'session_reused',
+  'tool_started',
+  'tool_finished',
+  'tool_failed',
+  'backend_status',
+  'backend_summary',
+  'backend_error',
+  'agent_finished',
+  'agent_failed',
+  'dm_sent',
+  'dm_failed',
+  'next_run_scheduled',
+  'job_disabled',
+  'run_interrupted',
+  'run_failed',
+  'run_finished',
+]);
 
 export type JobExecutionType = z.infer<typeof JobExecutionTypeSchema>;
 export type JobRunStatus = z.infer<typeof JobRunStatusSchema>;
+export type JobRunTrigger = z.infer<typeof JobRunTriggerSchema>;
+export type JobRunLogLevel = z.infer<typeof JobRunLogLevelSchema>;
+export type JobRunLogEvent = z.infer<typeof JobRunLogEventSchema>;
 
 export const JobBaseSchema = z.object({
   id: z.number(),
@@ -74,6 +100,21 @@ export const JobRunSchema = z.object({
   output: z.string().nullable(),
   error: z.string().nullable(),
   budget_used_msats: z.number().nullable(),
+  trigger: JobRunTriggerSchema,
+  scheduled_for: z.number().nullable(),
+  owner_pid: z.number().nullable(),
 });
 
 export type JobRun = z.infer<typeof JobRunSchema>;
+
+export const JobRunLogSchema = z.object({
+  id: z.number(),
+  run_id: z.number(),
+  occurred_at: z.number(),
+  event: JobRunLogEventSchema,
+  level: JobRunLogLevelSchema,
+  message: z.string(),
+  details: z.record(z.string(), z.unknown()).nullable(),
+});
+
+export type JobRunLog = z.infer<typeof JobRunLogSchema>;

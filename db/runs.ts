@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
-// plugins/job/db/runs.ts — job_runs CRUD
+// plugins/job/db/runs.ts — job_runs CRUD and execution metadata
 // ---------------------------------------------------------------------------
 
 import type { Database } from 'bun:sqlite';
 
-import type { JobRun, JobRunStatus } from '../types';
+import type { JobRun, JobRunStatus, JobRunTrigger } from '../types';
 
 import { rowToJobRun } from './row-map';
 
@@ -20,32 +20,87 @@ export function listJobRuns(
   return rows.map(rowToJobRun);
 }
 
-export function insertJobRun(db: Database, jobId: number): number {
-  const now = Date.now();
+type InsertJobRunProps = {
+  db: Database;
+  jobId: number;
+  startedAt: number;
+  trigger: JobRunTrigger;
+  scheduledFor: number | null;
+  ownerPid: number;
+};
 
-  const info = db
-    .prepare(
-      'INSERT INTO job_runs (job_id, started_at, finished_at, status, output, error) VALUES ($jobId, $startedAt, NULL, $status, NULL, NULL)',
-    )
-    .run({ jobId, startedAt: now, status: 'running' });
+export function insertJobRun({
+  db,
+  jobId,
+  startedAt,
+  trigger,
+  scheduledFor,
+  ownerPid,
+}: InsertJobRunProps): number | null {
+  const insert = db.prepare(
+    `INSERT INTO job_runs (
+       job_id, started_at, finished_at, status, output, error,
+       trigger_source, scheduled_for, owner_pid
+     )
+     SELECT
+       $jobId, $startedAt, NULL, $status, NULL, NULL,
+       $trigger, $scheduledFor, $ownerPid
+     FROM jobs j
+     WHERE j.id = $jobId
+       AND (
+         $trigger != 'scheduled'
+         OR (j.enabled = 1 AND j.next_run_at = $scheduledFor)
+       )
+       AND NOT EXISTS (
+       SELECT 1
+       FROM job_runs
+       WHERE job_id = $jobId AND status = 'running'
+     )`,
+  );
 
-  return Number(info.lastInsertRowid);
+  try {
+    const info = insert.run({
+      jobId,
+      startedAt,
+      status: 'running',
+      trigger,
+      scheduledFor,
+      ownerPid,
+    });
+
+    return info.changes === 0 ? null : Number(info.lastInsertRowid);
+  } catch (err) {
+    if (/UNIQUE constraint failed: job_runs\.job_id/.test(String(err))) {
+      return null;
+    }
+
+    throw err;
+  }
 }
 
-export function updateJobRun(
-  db: Database,
-  runId: number,
-  status: JobRunStatus,
-  output: string | null,
-  error: string | null,
-  budgetUsedMsats: number | null,
-): void {
-  const now = Date.now();
+type UpdateJobRunProps = {
+  db: Database;
+  runId: number;
+  status: JobRunStatus;
+  output: string | null;
+  error: string | null;
+  budgetUsedMsats: number | null;
+  finishedAt: number;
+};
 
+export function updateJobRun({
+  db,
+  runId,
+  status,
+  output,
+  error,
+  budgetUsedMsats,
+  finishedAt,
+}: UpdateJobRunProps): void {
   db.prepare(
     'UPDATE job_runs SET finished_at = $finishedAt, status = $status, output = $output, error = $error, budget_used_msats = $budgetUsedMsats WHERE id = $id',
   ).run({
-    finishedAt: now,
+    finishedAt,
     status,
     output,
     error,

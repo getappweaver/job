@@ -2,7 +2,7 @@ import type { Database } from 'bun:sqlite';
 
 import type { PluginContext, PluginIdentity } from '@src/core/plugin';
 import type { MessageSource } from '@src/messaging';
-import { parseCliInput } from '@src/system/parser-cli';
+import { parseCliInput, parseStructuredInput } from '@src/system/parser-cli';
 import type { WebNodeRoot } from '@src/web/ui-schema';
 
 import { adaptAiCommand } from './commands/ai/adapter';
@@ -15,9 +15,11 @@ import { adaptEnableCommand } from './commands/enable/adapter';
 import { adaptHelpCommand } from './commands/help/adapter';
 import { adaptHistoryCommand } from './commands/history/adapter';
 import { adaptListCommand } from './commands/list/adapter';
+import { adaptLogsCommand } from './commands/logs/adapter';
 import { adaptReviseCommand } from './commands/revise/adapter';
 import { adaptRunCommand } from './commands/run/adapter';
 import { adaptShowCommand } from './commands/show/adapter';
+import { adaptUpdateCommand } from './commands/update/adapter';
 import { getJobCommandDefinition } from './help';
 import type { JobCommandAdapterParams } from './types';
 
@@ -30,10 +32,12 @@ type JobSubcommand =
   | 'discard'
   | 'list'
   | 'show'
+  | 'update'
   | 'enable'
   | 'disable'
   | 'delete'
   | 'history'
+  | 'logs'
   | 'run';
 
 type MaybePromise<T> = T | Promise<T>;
@@ -56,12 +60,36 @@ const subcommandAdapters: Record<JobSubcommand, JobCommandAdapter> = {
   discard: adaptDiscardCommand,
   list: adaptListCommand,
   show: adaptShowCommand,
+  update: adaptUpdateCommand,
   enable: adaptEnableCommand,
   disable: adaptDisableCommand,
   delete: adaptDeleteCommand,
   history: adaptHistoryCommand,
+  logs: adaptLogsCommand,
   run: adaptRunCommand,
 };
+
+function isStructuredWebPayload(value: unknown): value is {
+  arguments?: Record<string, unknown>;
+  options?: Record<string, unknown>;
+} {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const candidate = value as { arguments?: unknown; options?: unknown };
+
+  return (
+    (candidate.arguments === undefined ||
+      (typeof candidate.arguments === 'object' &&
+        candidate.arguments !== null &&
+        !Array.isArray(candidate.arguments))) &&
+    (candidate.options === undefined ||
+      (typeof candidate.options === 'object' &&
+        candidate.options !== null &&
+        !Array.isArray(candidate.options)))
+  );
+}
 
 function getDefinitionKey(prefix: string, alias: string): string {
   return `${prefix}:${alias}`;
@@ -92,10 +120,12 @@ function isJobSubcommand(value: string): value is JobSubcommand {
     value === 'discard' ||
     value === 'list' ||
     value === 'show' ||
+    value === 'update' ||
     value === 'enable' ||
     value === 'disable' ||
     value === 'delete' ||
     value === 'history' ||
+    value === 'logs' ||
     value === 'run'
   );
 }
@@ -105,6 +135,7 @@ export async function handleJob(params: {
   prefix: string;
   alias: string;
   source: MessageSource;
+  jsonPayload: unknown;
   db: Database;
   ctx: PluginContext;
   identity: PluginIdentity;
@@ -119,12 +150,21 @@ export async function handleJob(params: {
   try {
     const command = getNormalizedDefinition(params.prefix, params.alias);
 
-    const parsed = parseCliInput({
-      command,
-      tokens: normalizedArgs,
-      rawInput:
-        `${params.prefix}${params.alias} ${normalizedArgs.join(' ')}`.trim(),
-    });
+    const parsed =
+      params.source === 'web' && isStructuredWebPayload(params.jsonPayload)
+        ? parseStructuredInput({
+            command,
+            subcommand,
+            arguments: params.jsonPayload.arguments ?? {},
+            options: params.jsonPayload.options ?? {},
+            rawInput: `${params.prefix}${params.alias} ${subcommand} (web json)`,
+          })
+        : parseCliInput({
+            command,
+            tokens: normalizedArgs,
+            rawInput:
+              `${params.prefix}${params.alias} ${normalizedArgs.join(' ')}`.trim(),
+          });
 
     if (!isJobSubcommand(parsed.subcommand)) {
       return `Unknown command: ${params.prefix}${params.alias} ${parsed.subcommand}`;

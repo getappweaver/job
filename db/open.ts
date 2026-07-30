@@ -8,6 +8,7 @@ import { Database } from 'bun:sqlite';
 
 import { createJobDraftsTable } from '../drafts';
 
+import { createSchedulerResourcesTable } from './scheduler-resources';
 import { createJobTables } from './tables';
 
 export function openDb(): Database {
@@ -19,6 +20,7 @@ export function openDb(): Database {
   db.run('PRAGMA journal_mode=WAL');
   createJobTables(db);
   createJobDraftsTable(db);
+  createSchedulerResourcesTable(db);
 
   return db;
 }

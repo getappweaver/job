@@ -12,10 +12,11 @@ import {
   getJobRunCount,
   getNextRunAt,
   listDueJobs,
+  recoverInterruptedJobRuns,
   updateJobRunTimes,
 } from './db';
 import { JobPluginContext } from './init';
-import { runJob } from './runner';
+import { isJobActive, runJob } from './runner';
 
 const TICK_MS = 60_000;
 
@@ -33,18 +34,30 @@ export function startJobTicker(pluginDb: Database): void {
       return;
     }
 
+    recoverInterruptedJobRuns({ db: pluginDb, isJobActive });
+
     const due = listDueJobs(pluginDb);
 
     for (const job of due) {
       const startedAt = Date.now();
 
       try {
-        await runJob({ job, pluginDb, ctx });
+        const result = await runJob({
+          job,
+          pluginDb,
+          ctx,
+          trigger: 'scheduled',
+          scheduledFor: job.next_run_at,
+        });
+
+        if (result.status === 'already_running') {
+          continue;
+        }
       } catch (err) {
         log.error(`Job ${job.id} (${job.name}) run failed: ${String(err)}`);
 
         const runCount = getJobRunCount(pluginDb, job.id);
-        const nextRunAt = getNextRunAt(job, startedAt, runCount);
+        const nextRunAt = getNextRunAt(job, Date.now(), runCount);
 
         updateJobRunTimes(pluginDb, job.id, startedAt, nextRunAt ?? null);
       }

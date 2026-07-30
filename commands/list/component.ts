@@ -24,6 +24,55 @@ function deleteJobAction(params: {
   };
 }
 
+function executeJobAction(params: {
+  command: string;
+  jobId: number;
+}): WebAction {
+  return {
+    type: 'command',
+    command: params.command,
+    subcommand: 'run',
+    arguments: { id: params.jobId },
+    options: {},
+    recordInTimeline: false,
+    refresh: listRefresh(params.command),
+  };
+}
+
+function showJobLogsAction(params: {
+  command: string;
+  jobId: number;
+  jobName: string;
+}): WebAction {
+  return {
+    type: 'command',
+    command: params.command,
+    subcommand: 'logs',
+    arguments: { id: params.jobId },
+    options: {},
+    recordInTimeline: false,
+    surface: 'modal',
+    modalTitle: `Job logs: ${params.jobName}`,
+  };
+}
+
+function updateJobAction(params: {
+  command: string;
+  jobId: number;
+  jobName: string;
+}): WebAction {
+  return {
+    type: 'command',
+    command: params.command,
+    subcommand: 'update',
+    arguments: { id: params.jobId },
+    options: {},
+    recordInTimeline: false,
+    surface: 'modal',
+    modalTitle: `Update job: ${params.jobName}`,
+  };
+}
+
 function setJobEnabledAction(params: {
   command: string;
   jobId: number;
@@ -172,6 +221,38 @@ function jobCard(params: { command: string; job: Job }): WebNode {
             buttonVariant: 'icon',
           },
           children: [
+            {
+              type: 'element',
+              tag: 'menuItem',
+              props: {
+                label: 'Execute job',
+                action: executeJobAction({ command, jobId: job.id }),
+              },
+            },
+            {
+              type: 'element',
+              tag: 'menuItem',
+              props: {
+                label: 'Show logs',
+                action: showJobLogsAction({
+                  command,
+                  jobId: job.id,
+                  jobName: job.name,
+                }),
+              },
+            },
+            {
+              type: 'element',
+              tag: 'menuItem',
+              props: {
+                label: 'Update',
+                action: updateJobAction({
+                  command,
+                  jobId: job.id,
+                  jobName: job.name,
+                }),
+              },
+            },
             {
               type: 'element',
               tag: 'menuItem',

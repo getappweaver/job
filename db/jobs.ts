@@ -9,6 +9,15 @@ import type { Job, JobDraftInput } from '../types';
 import { getNextRunAt, validateSchedule } from './cron-schedule';
 import { rowToJob } from './row-map';
 
+type UpdateJobDetailsProps = {
+  db: Database;
+  id: number;
+  name: string;
+  model: string;
+  prompt: string;
+  instructions: string | null;
+};
+
 export function getJobRunCount(db: Database, jobId: number): number {
   const row = db
     .prepare('SELECT COUNT(*) as c FROM job_runs WHERE job_id = $jobId')
@@ -138,6 +147,25 @@ export function getJob(db: Database, id: number): Job | null {
     | undefined;
 
   return row ? rowToJob(row) : null;
+}
+
+export function updateJobDetails({
+  db,
+  id,
+  name,
+  model,
+  prompt,
+  instructions,
+}: UpdateJobDetailsProps): Job | null {
+  const info = db
+    .prepare(
+      `UPDATE jobs
+       SET name = $name, model = $model, prompt = $prompt, instructions = $instructions
+       WHERE id = $id`,
+    )
+    .run({ id, name, model, prompt, instructions });
+
+  return info.changes > 0 ? getJob(db, id) : null;
 }
 
 export function deleteJob(db: Database, id: number): boolean {

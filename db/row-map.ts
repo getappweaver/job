@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// plugins/job/db/row-map.ts — SQLite row → Job / JobRun
+// plugins/job/db/row-map.ts — SQLite row → typed job records
 // ---------------------------------------------------------------------------
 
 import type { ProviderName, WorkspaceTarget } from '@src/db';
@@ -8,11 +8,16 @@ import { ProviderNameSchema, WorkspaceTargetSchema } from '@src/db';
 import {
   CronJobSchema,
   JobBaseSchema,
+  JobRunLogSchema,
   JobRunSchema,
   OneTimeJobSchema,
   type Job,
   type JobRun,
+  type JobRunLog,
+  type JobRunLogEvent,
+  type JobRunLogLevel,
   type JobRunStatus,
+  type JobRunTrigger,
 } from '../types';
 
 /** DB may contain empty or legacy values; JobBaseSchema requires local|routstr. */
@@ -86,5 +91,34 @@ export function rowToJobRun(row: Record<string, unknown>): JobRun {
     error: row.error != null ? String(row.error) : null,
     budget_used_msats:
       row.budget_used_msats != null ? Number(row.budget_used_msats) : null,
+    trigger: row.trigger_source as JobRunTrigger,
+    scheduled_for: row.scheduled_for != null ? Number(row.scheduled_for) : null,
+    owner_pid: row.owner_pid != null ? Number(row.owner_pid) : null,
+  });
+}
+
+export function rowToJobRunLog(row: Record<string, unknown>): JobRunLog {
+  let details: Record<string, unknown> | null = null;
+
+  if (typeof row.details_json === 'string') {
+    try {
+      const parsed = JSON.parse(row.details_json) as unknown;
+
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        details = parsed as Record<string, unknown>;
+      }
+    } catch {
+      details = { invalid_json: row.details_json };
+    }
+  }
+
+  return JobRunLogSchema.parse({
+    id: Number(row.id),
+    run_id: Number(row.run_id),
+    occurred_at: Number(row.occurred_at),
+    event: row.event as JobRunLogEvent,
+    level: row.level as JobRunLogLevel,
+    message: String(row.message),
+    details,
   });
 }

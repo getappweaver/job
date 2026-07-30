@@ -21,7 +21,21 @@ export async function handleRunCommand(
   }
 
   try {
-    await runJob({ job, pluginDb: db, ctx });
+    const result = await runJob({
+      job,
+      pluginDb: db,
+      ctx,
+      trigger: 'manual',
+      scheduledFor: null,
+    });
+
+    if (result.status === 'already_running') {
+      return `Job ${id} (${job.name}) is already running.`;
+    }
+
+    if (result.status === 'failed') {
+      return `Job ${id} (${job.name}) run failed. See job logs (${prefix}${alias} logs ${id}).`;
+    }
 
     return `Job ${id} (${job.name}) run completed. Result stored in job history (${prefix}${alias} history ${id}).`;
   } catch (err) {

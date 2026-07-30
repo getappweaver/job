@@ -10,9 +10,11 @@ import { draftsDefinition } from './commands/drafts/definition';
 import { enableDefinition } from './commands/enable/definition';
 import { historyDefinition } from './commands/history/definition';
 import { listDefinition } from './commands/list/definition';
+import { logsDefinition } from './commands/logs/definition';
 import { reviseDefinition } from './commands/revise/definition';
 import { runDefinition } from './commands/run/definition';
 import { showDefinition } from './commands/show/definition';
+import { updateDefinition } from './commands/update/definition';
 
 export const commandDefinition = (
   prefix: string,
@@ -35,10 +37,12 @@ export const commandDefinition = (
     discardDefinition(prefix, alias),
     listDefinition(prefix, alias),
     showDefinition(prefix, alias),
+    updateDefinition(prefix, alias),
     enableDefinition(prefix, alias),
     disableDefinition(prefix, alias),
     deleteDefinition(prefix, alias),
     historyDefinition(prefix, alias),
+    logsDefinition(prefix, alias),
     runDefinition(prefix, alias),
   ],
 });

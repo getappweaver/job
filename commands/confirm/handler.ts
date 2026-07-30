@@ -1,5 +1,8 @@
 import type { BaseProps } from '../../command-context';
-import { createJob } from '../../db';
+import {
+  createJob,
+  linkSchedulerResourceToJob,
+} from '../../db';
 import { deleteDraft, getDraft } from '../../drafts';
 import { formatNextRun } from '../../format';
 
@@ -31,6 +34,7 @@ export function handleConfirmCommand(
     }
 
     const job = createJob(db, entry.input);
+    linkSchedulerResourceToJob({ db, draftId, jobId: job.id });
     deleteDraft(db, draftId);
 
     const budgetLine =

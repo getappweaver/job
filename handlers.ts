@@ -13,6 +13,8 @@ export { handleDraftsCommand } from './commands/drafts/handler';
 export { handleEnableCommand } from './commands/enable/handler';
 export { handleHistoryCommand } from './commands/history/handler';
 export { handleListCommand } from './commands/list/handler';
+export { handleLogsCommand } from './commands/logs/handler';
 export { handleReviseCommand } from './commands/revise/handler';
 export { handleRunCommand } from './commands/run/handler';
 export { handleShowCommand } from './commands/show/handler';
+export { handleUpdateCommand } from './commands/update/handler';

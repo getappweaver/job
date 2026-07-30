@@ -15,10 +15,15 @@ import {
 
 import { handleJob } from './adapter';
 import { aiDefinition } from './ai';
-import { openDb } from './db';
+import {
+  createJobRunActiveIndex,
+  openDb,
+  recoverInterruptedJobRuns,
+} from './db';
 import { startJobTicker } from './engine';
 import { getJobCommandDefinition, getJobHelpLines } from './help';
 import { jobStories } from './stories';
+import { jobSchedulerProvider } from './scheduler-provider';
 
 const pluginDir = import.meta.dir;
 const alias = basename(pluginDir);
@@ -55,6 +60,7 @@ export const JobPlugin: BotPlugin = {
       prefix: context.prefix,
       alias,
       source: context.source,
+      jsonPayload: context.jsonPayload,
       db: JobPluginDb,
       ctx: {
         ...JobPluginContext,
@@ -70,6 +76,8 @@ export const JobPlugin: BotPlugin = {
 
     const db = openDb();
     JobPluginDb = db;
+    recoverInterruptedJobRuns({ db, isJobActive: () => false });
+    createJobRunActiveIndex(db);
     startJobTicker(db);
   },
   helpText: (a: string, prefix: string) => [
@@ -82,4 +90,5 @@ export const JobPlugin: BotPlugin = {
   commandDefinition: (prefix: string, pluginAlias: string) =>
     getJobCommandDefinition(prefix, pluginAlias),
   stories: jobStories,
+  capabilityProviders: [jobSchedulerProvider],
 };
