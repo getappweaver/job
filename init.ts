@@ -22,8 +22,8 @@ import {
 } from './db';
 import { startJobTicker } from './engine';
 import { getJobCommandDefinition, getJobHelpLines } from './help';
-import { jobStories } from './stories';
 import { jobSchedulerProvider } from './scheduler-provider';
+import { jobStories } from './stories';
 
 const pluginDir = import.meta.dir;
 const alias = basename(pluginDir);

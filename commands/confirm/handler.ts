@@ -1,8 +1,5 @@
 import type { BaseProps } from '../../command-context';
-import {
-  createJob,
-  linkSchedulerResourceToJob,
-} from '../../db';
+import { createJob, linkSchedulerResourceToJob } from '../../db';
 import { deleteDraft, getDraft } from '../../drafts';
 import { formatNextRun } from '../../format';
 

@@ -288,7 +288,27 @@ function jobCard(params: { command: string; job: Job }): WebNode {
             tag: 'stack',
             props: { gap: 'xs', fill: true },
             children: [
-              textBlock(`Next: ${formatNextRun(job.next_run_at)}`, 'muted'),
+              row(
+                [
+                  textBlock(`Next: ${formatNextRun(job.next_run_at)}`, 'muted'),
+                  ...(job.next_run_at === null
+                    ? []
+                    : [
+                        textBlock('·', 'muted'),
+                        {
+                          type: 'element' as const,
+                          tag: 'countdown' as const,
+                          renderKey: `job-next-countdown-${job.id}`,
+                          props: {
+                            targetTimestamp: Math.floor(job.next_run_at / 1000),
+                            tone: 'muted' as const,
+                          },
+                          children: [],
+                        },
+                      ]),
+                ],
+                'xs',
+              ),
               textBlock(`Schedule: ${jobScheduleLabel(job)}`, 'muted'),
               textBlock(`Context: ${formatContextLine(job)}`, 'muted'),
               textBlock(`Prompt: ${job.prompt}`, 'muted'),

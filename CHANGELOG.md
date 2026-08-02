@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v4.3.0] - 2026-08-02
+
+- feat: show live job countdowns (175829c)
+
 ## [v4.2.0] - 2026-07-30
 
-- feat: add scheduler capabilities and detailed job controls (9efcc0c)
+- feat: add scheduler capabilities and detailed job controls (e605fff)
 
 ## [v4.1.1] - 2026-07-15
 
