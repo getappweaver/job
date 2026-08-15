@@ -55,12 +55,12 @@ export function isJobActive(jobId: number): boolean {
   return activeJobIds.has(jobId);
 }
 
-type SendJobDmProps = {
+type SendJobNotificationProps = {
   ctx: PluginContext;
   pluginDb: Database;
   runId: number;
   jobName: string;
-  message: string;
+  body: string;
 };
 
 async function sendJobDm({
@@ -68,12 +68,12 @@ async function sendJobDm({
   pluginDb,
   runId,
   jobName,
-  message,
-}: SendJobDmProps): Promise<void> {
+  body,
+}: SendJobNotificationProps): Promise<void> {
   const startedAt = Date.now();
 
   try {
-    await ctx.sendDm(message);
+    await ctx.sendDm(`[Job: ${jobName}]\n${body}`);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
 
@@ -111,6 +111,98 @@ async function sendJobDm({
   } catch (err) {
     log.error(`Failed to store DM success for job ${jobName}: ${String(err)}`);
   }
+}
+
+async function sendJobPush({
+  ctx,
+  pluginDb,
+  runId,
+  jobName,
+  body,
+}: SendJobNotificationProps): Promise<void> {
+  const startedAt = Date.now();
+
+  try {
+    const maxBodyLength = 2_000;
+
+    const result = await ctx.sendWebPush({
+      title: `Job: ${jobName}`,
+      body:
+        body.length > maxBodyLength ? `${body.slice(0, maxBodyLength)}…` : body,
+      url: '/?command=job&subcommand=list',
+    });
+
+    if (result.status === 'disabled') {
+      appendJobRunLog({
+        db: pluginDb,
+        runId,
+        event: 'push_skipped',
+        level: 'info',
+        message: 'Web Push is not configured.',
+        details: { duration_ms: Date.now() - startedAt },
+        occurredAt: Date.now(),
+      });
+
+      return;
+    }
+
+    const accepted = result.accepted > 0;
+    const attempted = result.attempted > 0;
+
+    appendJobRunLog({
+      db: pluginDb,
+      runId,
+      event: attempted
+        ? accepted
+          ? 'push_sent'
+          : 'push_failed'
+        : 'push_skipped',
+      level: attempted ? (accepted ? 'success' : 'error') : 'info',
+      message: attempted
+        ? `${result.accepted}/${result.attempted} push notification(s) accepted by push service.`
+        : 'No Web Push subscriptions are registered.',
+      details: {
+        attempted: result.attempted,
+        accepted: result.accepted,
+        failed: result.failed,
+        removed: result.removed,
+        duration_ms: Date.now() - startedAt,
+      },
+      occurredAt: Date.now(),
+    });
+
+    if (result.failed > 0) {
+      log.warn(
+        `Web Push for job ${jobName}: ${result.accepted} accepted, ${result.failed} failed, ${result.removed} stale removed.`,
+      );
+    }
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+
+    try {
+      appendJobRunLog({
+        db: pluginDb,
+        runId,
+        event: 'push_failed',
+        level: 'error',
+        message: error,
+        details: { duration_ms: Date.now() - startedAt },
+        occurredAt: Date.now(),
+      });
+    } catch (logError) {
+      log.error(
+        `Failed to store Web Push failure for job ${jobName}: ${String(logError)}`,
+      );
+    }
+
+    log.error(`Failed to send Web Push for job ${jobName}: ${error}`);
+  }
+}
+
+async function sendJobNotifications(
+  props: SendJobNotificationProps,
+): Promise<void> {
+  await Promise.all([sendJobDm(props), sendJobPush(props)]);
 }
 
 type JobSessionLog = {
@@ -522,12 +614,12 @@ async function runJobOnce({
 
     activeJobIds.delete(job.id);
 
-    await sendJobDm({
+    await sendJobNotifications({
       ctx,
       pluginDb,
       runId,
       jobName: job.name,
-      message: `[Job: ${job.name}]\nError: ${errMsg}`,
+      body: `Error: ${errMsg}`,
     });
 
     return false;
@@ -573,12 +665,12 @@ async function runJobOnce({
 
     activeJobIds.delete(job.id);
 
-    await sendJobDm({
+    await sendJobNotifications({
       ctx,
       pluginDb,
       runId,
       jobName: job.name,
-      message: `[Job: ${job.name}]\nError: ${errMsg}`,
+      body: `Error: ${errMsg}`,
     });
 
     return false;
@@ -628,12 +720,12 @@ async function runJobOnce({
 
   activeJobIds.delete(job.id);
 
-  await sendJobDm({
+  await sendJobNotifications({
     ctx,
     pluginDb,
     runId,
     jobName: job.name,
-    message: `[Job: ${job.name}]\n${output || '(no output)'}`,
+    body: output || '(no output)',
   });
 
   return success;
@@ -717,12 +809,12 @@ export async function runJob(props: RunJobProps): Promise<RunJobResult> {
     if (failure !== null) {
       activeJobIds.delete(props.job.id);
 
-      await sendJobDm({
+      await sendJobNotifications({
         ctx: props.ctx,
         pluginDb: props.pluginDb,
         runId: failure.runId,
         jobName: props.job.name,
-        message: `[Job: ${props.job.name}]\nError: ${failure.message}`,
+        body: `Error: ${failure.message}`,
       });
 
       return { status: 'failed' };

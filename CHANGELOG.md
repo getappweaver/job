@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v4.4.0] - 2026-08-15
+
+- feat: add web push support for jobs (a811a07)
+
 ## [v4.3.0] - 2026-08-02
 
-- feat: show live job countdowns (175829c)
+- feat: show live job countdowns (6c20768)
 
 ## [v4.2.0] - 2026-07-30
 
