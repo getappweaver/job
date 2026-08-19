@@ -33,8 +33,7 @@ export function storeDraft(db: Database, entry: JobDraftEntry): number {
 
 export function getDraft(db: Database, id: number): JobDraftRow | null {
   const row = db.prepare('SELECT * FROM job_drafts WHERE id = ?').get(id) as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
 
   if (!row) {
     return null;

@@ -43,9 +43,7 @@ export type RunJobProps = {
 };
 
 export type RunJobResult =
-  | { status: 'success' }
-  | { status: 'failed' }
-  | { status: 'already_running' };
+  { status: 'success' } | { status: 'failed' } | { status: 'already_running' };
 
 const activeJobIds = new Set<number>();
 
@@ -749,8 +747,7 @@ function finalizeUnexpectedFailure({
        LIMIT 1`,
     )
     .get(props.job.id, process.pid) as
-    | { id: number; started_at: number }
-    | undefined;
+    { id: number; started_at: number } | undefined;
 
   if (!row) {
     return null;

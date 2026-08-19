@@ -143,8 +143,7 @@ export function listJobs(db: Database): Job[] {
 
 export function getJob(db: Database, id: number): Job | null {
   const row = db.prepare('SELECT * FROM jobs WHERE id = ?').get(id) as
-    | Record<string, unknown>
-    | undefined;
+    Record<string, unknown> | undefined;
 
   return row ? rowToJob(row) : null;
 }

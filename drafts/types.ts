@@ -28,9 +28,7 @@ export type DeleteDraftEntry = {
 };
 
 export type JobDraftEntry =
-  | CreateDraftEntry
-  | UpdateDraftEntry
-  | DeleteDraftEntry;
+  CreateDraftEntry | UpdateDraftEntry | DeleteDraftEntry;
 
 export type JobDraftRow = JobDraftEntry & {
   id: number;
