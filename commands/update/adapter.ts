@@ -149,7 +149,9 @@ export async function adaptUpdateCommand(
     return formatTextResult(id, result);
   }
 
-  const modelChoices = await params.ctx.getAvailableModels().catch(() => []);
+  const modelChoices = await params.ctx.agent
+    .getAvailableModels({ backend: null })
+    .catch(() => []);
 
   return renderUpdateWeb({
     alias: params.alias,

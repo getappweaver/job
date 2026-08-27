@@ -101,13 +101,15 @@ function draftInput(input: SchedulerCreateInputV1): JobDraftInput {
     throw new Error('Job plugin context is not initialized.');
   }
 
+  const defaults = JobPluginContext.agent.getDefaults();
+
   const base = {
     name: input.name,
     prompt: input.task.prompt,
     schedule_description: input.schedule.description,
-    backend: JobPluginContext.defaults.backend,
-    provider: JobPluginContext.defaults.provider,
-    model: JobPluginContext.defaults.model ?? '',
+    backend: defaults.backend,
+    provider: defaults.provider,
+    model: defaults.model ?? '',
     mode: input.task.mode,
     workspace_target: input.task.workspaceTarget,
     budget_sats: null,

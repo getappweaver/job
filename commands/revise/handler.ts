@@ -20,10 +20,6 @@ export async function handleReviseCommand(
   const { prefix, alias, db, ctx, draftIdRaw, corrections } = props;
   const cmd = `${prefix}${alias}`;
 
-  if (!ctx.runAgent) {
-    return `${cmd} revise requires an agent backend. Set backend (e.g. !backend opencode) and try again.`;
-  }
-
   if (!draftIdRaw) {
     return `Usage: ${cmd} revise <draft_id> <corrections>`;
   }
@@ -53,8 +49,7 @@ export async function handleReviseCommand(
   try {
     input = await generateCreateWithParams({
       systemPrompt: buildRevisePrompt(entry, corrections),
-      runAgent: ctx.runAgent,
-      defaults: ctx.defaults,
+      agent: ctx.agent,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

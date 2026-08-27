@@ -4,15 +4,7 @@
 
 import type { Database } from 'bun:sqlite';
 
-import type { PluginDefaults } from '@src/core/plugin';
-import {
-  getAgentBackend,
-  getCurrentOrDefaultMode,
-  getModelOverride,
-  getProviderName,
-  getWorkspaceTarget,
-  openCoreDb,
-} from '@src/db';
+import type { PluginAgentService } from '@src/core/plugin';
 
 import { getJob, listJobs } from '../../db';
 import { createDraftSessionId, storeDraft } from '../../drafts';
@@ -109,11 +101,13 @@ export async function executeTool({
   call,
   db,
   prefix,
+  agent,
 }: {
   alias: string;
   call: JobToolCall;
   db: Database;
   prefix: string;
+  agent: PluginAgentService;
 }): Promise<string> {
   switch (call.type) {
     case 'list':
@@ -123,41 +117,30 @@ export async function executeTool({
     case 'context':
       return formatCurrentTimeContext();
     case 'create': {
-      const coreDb = openCoreDb();
+      const defaults = agent.getDefaults();
 
-      try {
-        const backendName = getAgentBackend(coreDb);
+      const fullInput = JobDraftInputSchema.parse({
+        ...call.input,
+        backend: defaults.backend,
+        provider: defaults.provider,
+        model: defaults.model ?? '',
+        mode: defaults.mode,
+        workspace_target: defaults.workspaceTarget,
+      });
 
-        const defaults: PluginDefaults = {
-          backend: backendName,
-          provider: getProviderName(coreDb),
-          model: getModelOverride(coreDb, backendName),
-          mode: getCurrentOrDefaultMode(coreDb),
-          workspace_target: getWorkspaceTarget(coreDb),
-        };
+      const draftId = storeDraft(db, {
+        sessionId: createDraftSessionId(),
+        kind: 'create',
+        input: fullInput,
+        originalPrompt: call.original_prompt,
+      });
 
-        const fullInput = JobDraftInputSchema.parse({
-          ...call.input,
-          ...defaults,
-          model: defaults.model ?? '',
-        });
-
-        const draftId = storeDraft(db, {
-          sessionId: createDraftSessionId(),
-          kind: 'create',
-          input: fullInput,
-          originalPrompt: call.original_prompt,
-        });
-
-        return formatCreateWithPreview({
-          draftId: String(draftId),
-          input: fullInput,
-          prefix,
-          alias,
-        });
-      } finally {
-        coreDb.close();
-      }
+      return formatCreateWithPreview({
+        draftId: String(draftId),
+        input: fullInput,
+        prefix,
+        alias,
+      });
     }
   }
 }

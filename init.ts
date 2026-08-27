@@ -64,7 +64,7 @@ export const JobPlugin: BotPlugin = {
       db: JobPluginDb,
       ctx: {
         ...JobPluginContext,
-        runAgent: context.runAgent,
+        agent: context.agent,
         promptFn: context.promptFn ?? JobPluginContext.promptFn,
         sendReply: context.sendReply ?? JobPluginContext.sendReply,
       },

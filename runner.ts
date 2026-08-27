@@ -4,23 +4,15 @@
 // Backend and session come from the job (session_id only for cron; one-time always new session).
 // Output is stored in job_runs; lifecycle events are stored in job_run_logs; results are sent by DM.
 // ---------------------------------------------------------------------------
-import { join } from 'path';
-
 import type { Database } from 'bun:sqlite';
 
 import type {
   AgentStreamChunk,
   AgentToolCall,
 } from '@src/backends/agent-stream-chunk';
-import { createBackend } from '@src/backends/factory';
-import {
-  getOutputString,
-  type AgentBackend,
-  type AgentRunResult,
-} from '@src/backends/types';
+import { getOutputString, type AgentRunResult } from '@src/backends/types';
 import type { PluginContext } from '@src/core/plugin';
 import { log } from '@src/logger';
-import { dmBotRoot } from '@src/paths';
 
 import {
   appendJobRunLog,
@@ -579,24 +571,33 @@ async function runJobOnce({
       ? `${executionPreamble}\n\nAdditional instructions:\n${job.instructions}\n\nJob request:\n${job.prompt}`
       : `${executionPreamble}\n\nJob request:\n${job.prompt}`;
 
-  let backend: AgentBackend;
-  let sessionId: string;
+  const existingSessionId =
+    job.execution_type === 'cron' ? job.session_id : null;
+
+  let sessionId = existingSessionId;
+  let result: AgentRunResult;
 
   try {
-    backend = createBackend({
-      backendName: job.backend,
-      dmBotRoot: dmBotRoot,
-      cursorMode: job.mode,
-      opencodeAgentName: job.backend === 'opencode' ? job.mode : null,
-      attachUrl: null,
-      modelOverride: job.model,
-      providerName: job.provider,
+    result = await ctx.agent.run({
+      prompt: effectiveContent,
+      sessionId,
+      backend: job.backend,
+      provider: job.provider,
+      model: job.model || null,
+      mode: job.mode,
+      workspaceTarget: job.workspace_target,
+      cwd: null,
+      onAgentStreamChunk,
+      abortSignal: streamAbortController.signal,
+      context: {
+        runtimeContext: true,
+        workspaceInstructions: true,
+        agentsInstructions: false,
+        extraInstructions: null,
+      },
     });
 
-    sessionId =
-      job.execution_type === 'cron' && job.session_id != null
-        ? job.session_id
-        : await backend.createSession(dmBotRoot);
+    sessionId = result.sessionId;
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
 
@@ -623,56 +624,13 @@ async function runJobOnce({
     return false;
   }
 
-  const reusedSession = job.execution_type === 'cron' && job.session_id != null;
+  const reusedSession = existingSessionId !== null;
 
   const sessionLog: JobSessionLog = {
-    sessionId,
+    sessionId: sessionId!,
     reused: reusedSession,
     occurredAt: Date.now(),
   };
-
-  const cwd =
-    job.workspace_target === 'appweaver' ? dmBotRoot : join(dmBotRoot, '..');
-
-  let result: AgentRunResult;
-
-  try {
-    result = await backend.runMessage({
-      sessionId,
-      content: effectiveContent,
-      cursorMode: job.mode,
-      opencodeAgentName: job.backend === 'opencode' ? job.mode : null,
-      cwd,
-      getRoutstrSkKey: ctx.getRoutstrSkKey,
-      modelOverride: job.model,
-      onAgentStreamChunk,
-      streamAbortSignal: streamAbortController.signal,
-    });
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-
-    persistJobFailure({
-      job,
-      pluginDb,
-      runId,
-      startedAt,
-      error: err,
-      message: errMsg,
-      session: sessionLog,
-    });
-
-    activeJobIds.delete(job.id);
-
-    await sendJobNotifications({
-      ctx,
-      pluginDb,
-      runId,
-      jobName: job.name,
-      body: `Error: ${errMsg}`,
-    });
-
-    return false;
-  }
 
   const output = getOutputString(result);
   const success = result.type === 'success';
@@ -691,7 +649,7 @@ async function runJobOnce({
       details:
         result.type === 'success'
           ? {
-              model: result.model ?? backend.modelName,
+              model: result.model ?? job.model,
               tokens: result.tokens ?? null,
               cost: result.cost ?? null,
             }
@@ -700,7 +658,7 @@ async function runJobOnce({
     });
 
     if (job.execution_type === 'cron' && job.session_id == null) {
-      updateJobSessionId(pluginDb, job.id, sessionId);
+      updateJobSessionId(pluginDb, job.id, sessionId!);
     }
 
     finishJobRun({

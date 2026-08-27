@@ -3,27 +3,33 @@
 // ---------------------------------------------------------------------------
 
 import { getOutputString } from '@src/backends/types';
-import type { PluginDefaults, RunAgentFn } from '@src/core/plugin';
+import type { PluginAgentService } from '@src/core/plugin';
 
 import type { JobDraftInput } from '../../types';
 import { JobDraftInputSchema, JobDraftPromptInputSchema } from '../../types';
 
 export type GenerateCreateWithParamsProps = {
   systemPrompt: string;
-  runAgent: RunAgentFn | null;
-  defaults: PluginDefaults;
+  agent: PluginAgentService;
 };
 
 export async function generateCreateWithParams({
   systemPrompt,
-  runAgent,
-  defaults,
+  agent,
 }: GenerateCreateWithParamsProps): Promise<JobDraftInput> {
-  if (!runAgent) {
-    throw new Error('runAgent is not set');
-  }
-
-  const result = await runAgent(systemPrompt);
+  const result = await agent.run({
+    prompt: systemPrompt,
+    sessionId: null,
+    backend: null,
+    provider: null,
+    model: null,
+    mode: null,
+    workspaceTarget: null,
+    cwd: null,
+    onAgentStreamChunk: null,
+    abortSignal: null,
+    context: null,
+  });
 
   if (result.type === 'error') {
     throw new Error(result.output);
@@ -61,9 +67,15 @@ export async function generateCreateWithParams({
 
   const promptInput = JobDraftPromptInputSchema.parse(parsed);
 
+  const defaults = agent.getDefaults();
+
   const fullInput = {
     ...promptInput,
-    ...defaults,
+    backend: defaults.backend,
+    provider: defaults.provider,
+    model: defaults.model ?? '',
+    mode: defaults.mode,
+    workspace_target: defaults.workspaceTarget,
   };
 
   return JobDraftInputSchema.parse(fullInput);

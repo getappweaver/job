@@ -45,8 +45,7 @@ export async function handleJobAi({
   try {
     draftInput = await generateCreateWithParams({
       systemPrompt,
-      runAgent: ctx.runAgent,
-      defaults: ctx.defaults,
+      agent: ctx.agent,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

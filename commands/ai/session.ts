@@ -108,10 +108,6 @@ async function reviseDraft(
 ): Promise<string | null> {
   const { db, ctx, draft, corrections } = props;
 
-  if (!ctx.runAgent) {
-    return 'Revise requires an agent backend.';
-  }
-
   if (draft.kind !== 'create') {
     return `Draft ${draft.id} is not a create draft (kind: ${draft.kind}).`;
   }
@@ -121,8 +117,7 @@ async function reviseDraft(
   try {
     input = await generateCreateWithParams({
       systemPrompt: buildRevisePrompt(draft, corrections),
-      runAgent: ctx.runAgent,
-      defaults: ctx.defaults,
+      agent: ctx.agent,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

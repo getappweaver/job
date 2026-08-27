@@ -9,7 +9,7 @@ import { z } from 'zod';
 // Prompt-only schema (what the model must output)
 //
 // Intentionally omits: backend/provider/model/mode/workspace_target.
-// These are injected from ctx.defaults after generation.
+// These are injected from the core agent defaults after generation.
 // ---------------------------------------------------------------------------
 
 const JobDraftBaseSchema = z.object({
