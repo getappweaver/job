@@ -24,7 +24,12 @@ import {
   updateJobRunTimes,
   updateJobSessionId,
 } from './db';
-import type { Job, JobRunStatus, JobRunTrigger } from './types';
+import {
+  schedulerTaskForJob,
+  type Job,
+  type JobRunStatus,
+  type JobRunTrigger,
+} from './types';
 
 export type RunJobProps = {
   job: Job;
@@ -489,6 +494,116 @@ function persistJobFailure({
   persist();
 }
 
+async function runPluginToolJob({
+  job,
+  pluginDb,
+  ctx,
+  runId,
+  startedAt,
+}: Pick<RunJobProps, 'job' | 'pluginDb' | 'ctx'> & {
+  runId: number;
+  startedAt: number;
+}): Promise<boolean> {
+  const task = schedulerTaskForJob(job);
+
+  if (task.type !== 'plugin-tool') {
+    throw new Error(`Job ${job.id} does not contain a plugin-tool task.`);
+  }
+
+  appendJobRunLog({
+    db: pluginDb,
+    runId,
+    event: 'tool_started',
+    level: 'info',
+    message: `${task.alias}.${task.toolName}`,
+    details: { alias: task.alias, tool_name: task.toolName, input: task.input },
+    occurredAt: Date.now(),
+  });
+
+  let output: string;
+
+  try {
+    output = await ctx.executePluginTool({
+      alias: task.alias,
+      toolName: task.toolName,
+      input: task.input,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+
+    const persist = pluginDb.transaction(() => {
+      appendJobRunLog({
+        db: pluginDb,
+        runId,
+        event: 'tool_failed',
+        level: 'error',
+        message,
+        details:
+          error instanceof Error
+            ? { error_name: error.name, stack: error.stack ?? null }
+            : null,
+        occurredAt: Date.now(),
+      });
+
+      finishJobRun({
+        job,
+        pluginDb,
+        runId,
+        startedAt,
+        status: 'error',
+        output: null,
+        error: message,
+      });
+    });
+
+    persist();
+
+    await sendJobNotifications({
+      ctx,
+      pluginDb,
+      runId,
+      jobName: job.name,
+      body: `Error: ${message}`,
+    });
+
+    return false;
+  }
+
+  const persist = pluginDb.transaction(() => {
+    appendJobRunLog({
+      db: pluginDb,
+      runId,
+      event: 'tool_finished',
+      level: 'success',
+      message: `${task.alias}.${task.toolName}`,
+      details: { alias: task.alias, tool_name: task.toolName },
+      occurredAt: Date.now(),
+    });
+
+    finishJobRun({
+      job,
+      pluginDb,
+      runId,
+      startedAt,
+      status: 'success',
+      output,
+      error: null,
+    });
+  });
+
+  persist();
+
+  await sendJobNotifications({
+    ctx,
+    pluginDb,
+    runId,
+    jobName: job.name,
+    body: output || '(no output)',
+  });
+
+  return true;
+}
+
 /**
  * Run a single job: build backend from job row, resolve session (cron: reuse job.session_id or create and persist), run message, update run and job times.
  */
@@ -547,6 +662,10 @@ async function runJobOnce({
 
   if (runId === null) {
     throw new JobAlreadyRunningError();
+  }
+
+  if (job.task_type === 'plugin-tool') {
+    return runPluginToolJob({ job, pluginDb, ctx, runId, startedAt });
   }
 
   const onAgentStreamChunk = createBackendStreamLogger({ pluginDb, runId });

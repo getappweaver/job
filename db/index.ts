@@ -10,6 +10,7 @@ export {
   listJobs,
   getJob,
   updateJobDetails,
+  updateJobTask,
   deleteJob,
   updateJobSessionId,
   enableJob,

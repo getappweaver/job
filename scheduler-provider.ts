@@ -4,6 +4,11 @@ import {
   SchedulerV1,
   type SchedulerCreateInputV1,
 } from '@src/capabilities/scheduler.v1';
+import {
+  SchedulerV2,
+  type SchedulerCreateInputV2,
+  type SchedulerTaskV2,
+} from '@src/capabilities/scheduler.v2';
 import { defineCapabilityProvider } from '@src/capabilities/types';
 import { CapabilityResourceNotFoundError } from '@src/core/capabilities/errors';
 import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
@@ -16,10 +21,11 @@ import {
   getJob,
   getSchedulerResource,
   listSchedulerResources,
+  updateJobTask,
 } from './db';
 import { getDraft } from './drafts';
 import { JobPluginContext, JobPluginDb } from './init';
-import type { Job, JobDraftInput } from './types';
+import { schedulerTaskForJob, type Job, type JobDraftInput } from './types';
 
 const alias = basename(import.meta.dir);
 
@@ -115,6 +121,48 @@ function draftInput(input: SchedulerCreateInputV1): JobDraftInput {
     budget_sats: null,
     instructions: null,
   };
+
+  return input.schedule.type === 'cron'
+    ? {
+        ...base,
+        execution_type: 'cron',
+        schedule: input.schedule.expression,
+        maxRuns: input.schedule.maxRuns,
+      }
+    : {
+        ...base,
+        execution_type: 'one-time',
+        run_at: input.schedule.runAt,
+      };
+}
+
+type SchedulerV2JobInput = JobDraftInput & { task: SchedulerTaskV2 };
+
+function draftInputV2(input: SchedulerCreateInputV2): SchedulerV2JobInput {
+  if (!JobPluginContext) {
+    throw new Error('Job plugin context is not initialized.');
+  }
+
+  const defaults = JobPluginContext.agent.getDefaults();
+
+  const prompt =
+    input.task.type === 'agent-prompt'
+      ? input.task.prompt
+      : `Run plugin tool ${input.task.alias}.${input.task.toolName}.`;
+
+  const base = {
+    name: input.name,
+    prompt,
+    schedule_description: input.schedule.description,
+    backend: defaults.backend,
+    provider: defaults.provider,
+    model: defaults.model ?? '',
+    mode: 'agent',
+    workspace_target: 'appweaver',
+    budget_sats: null,
+    instructions: null,
+    task: input.task,
+  } as const;
 
   return input.schedule.type === 'cron'
     ? {
@@ -271,6 +319,144 @@ export const jobSchedulerProvider = defineCapabilityProvider({
         nextRunAt: null,
         view: reviewDraft(draft.id, draft.input),
       };
+    },
+  },
+});
+
+function resourceV2(providerId: string, resourceId: string) {
+  return {
+    capability: { name: 'scheduler', version: 2 },
+    providerId,
+    resourceType: 'schedule',
+    resourceId,
+  } as const;
+}
+
+function jobSummaryV2(providerId: string, resourceId: string, job: Job) {
+  return {
+    resource: resourceV2(providerId, resourceId),
+    status: 'created' as const,
+    name: job.name,
+    enabled: Boolean(job.enabled),
+    scheduleDescription: job.schedule_description,
+    nextRunAt: job.next_run_at,
+    task: schedulerTaskForJob(job),
+  };
+}
+
+export const jobSchedulerV2Provider = defineCapabilityProvider({
+  contract: SchedulerV2,
+  operations: {
+    [SchedulerV2.operations.create.id]: async ({ input, providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const jobInput = draftInputV2(input);
+
+      const create = db.transaction(() => {
+        const job = createJob(db, jobInput);
+
+        if (!input.enabled) {
+          disableJob(db, job.id);
+        }
+
+        const resourceId = createSchedulerResourceForJob({
+          db,
+          jobId: job.id,
+          enabled: input.enabled,
+        });
+
+        return { job: getJob(db, job.id) ?? job, resourceId };
+      });
+
+      const created = create();
+
+      return {
+        ...jobSummaryV2(providerId, created.resourceId, created.job),
+        review: null,
+      };
+    },
+    [SchedulerV2.operations.list.id]: async ({ providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+
+      const schedules = listSchedulerResources(db).flatMap((mapping) => {
+        const job = mapping.jobId === null ? null : getJob(db, mapping.jobId);
+
+        return job ? [jobSummaryV2(providerId, mapping.resourceId, job)] : [];
+      });
+
+      return {
+        schedules,
+        view: renderJobListComponent({
+          command: alias,
+          prefix: '/',
+          jobs: schedules.flatMap((schedule) => {
+            const mapping = getSchedulerResource(
+              db,
+              schedule.resource.resourceId,
+            );
+
+            const job = mapping?.jobId ? getJob(db, mapping.jobId) : null;
+
+            return job ? [job] : [];
+          }),
+        }),
+      };
+    },
+    [SchedulerV2.operations.show.id]: async ({ input, providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const mapping = getSchedulerResource(db, input.resourceId);
+      const job = mapping?.jobId ? getJob(db, mapping.jobId) : null;
+
+      if (!mapping || !job) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV2.capability,
+          input.resourceId,
+        );
+      }
+
+      return {
+        ...jobSummaryV2(providerId, input.resourceId, job),
+        view: renderJobListComponent({
+          command: alias,
+          prefix: '/',
+          jobs: [job],
+        }),
+      };
+    },
+    [SchedulerV2.operations['update-task'].id]: async ({
+      input,
+      providerId,
+    }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const mapping = getSchedulerResource(db, input.resourceId);
+
+      const job = mapping?.jobId
+        ? updateJobTask(db, mapping.jobId, input.task)
+        : null;
+
+      if (!mapping || !job) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV2.capability,
+          input.resourceId,
+        );
+      }
+
+      return jobSummaryV2(providerId, input.resourceId, job);
     },
   },
 });

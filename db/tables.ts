@@ -30,6 +30,28 @@ export function createJobTables(db: Database): void {
     )
   `);
 
+  const jobColumns = db.query('PRAGMA table_info(jobs)').all() as Array<{
+    name: string;
+  }>;
+
+  if (!jobColumns.some((column) => column.name === 'task_type')) {
+    db.run(
+      "ALTER TABLE jobs ADD COLUMN task_type TEXT NOT NULL DEFAULT 'agent-prompt'",
+    );
+  }
+
+  if (!jobColumns.some((column) => column.name === 'tool_alias')) {
+    db.run('ALTER TABLE jobs ADD COLUMN tool_alias TEXT');
+  }
+
+  if (!jobColumns.some((column) => column.name === 'tool_name')) {
+    db.run('ALTER TABLE jobs ADD COLUMN tool_name TEXT');
+  }
+
+  if (!jobColumns.some((column) => column.name === 'tool_input_json')) {
+    db.run('ALTER TABLE jobs ADD COLUMN tool_input_json TEXT');
+  }
+
   db.run(`
     CREATE TABLE IF NOT EXISTS job_runs (
       id                INTEGER PRIMARY KEY,

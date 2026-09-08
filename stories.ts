@@ -34,6 +34,10 @@ const scheduledJob = {
   budget_sats: null,
   instructions:
     'Keep the brief actionable and include only items that can be started today.',
+  task_type: 'agent-prompt',
+  tool_alias: null,
+  tool_name: null,
+  tool_input: null,
   run_at: null,
   max_runs: null,
   session_id: null,

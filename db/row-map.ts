@@ -37,6 +37,20 @@ function coerceStoredWorkspaceTarget(raw: unknown): WorkspaceTarget {
 }
 
 export function rowToJob(row: Record<string, unknown>): Job {
+  let toolInput: Record<string, unknown> | null = null;
+
+  if (typeof row.tool_input_json === 'string') {
+    try {
+      const parsed = JSON.parse(row.tool_input_json) as unknown;
+
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        toolInput = parsed as Record<string, unknown>;
+      }
+    } catch {
+      toolInput = null;
+    }
+  }
+
   const commonRaw = {
     id: Number(row.id),
     name: String(row.name),
@@ -54,6 +68,10 @@ export function rowToJob(row: Record<string, unknown>): Job {
     workspace_target: coerceStoredWorkspaceTarget(row.workspace_target),
     budget_sats: row.budget_sats != null ? Number(row.budget_sats) : null,
     instructions: row.instructions != null ? String(row.instructions) : null,
+    task_type: row.task_type === 'plugin-tool' ? 'plugin-tool' : 'agent-prompt',
+    tool_alias: row.tool_alias != null ? String(row.tool_alias) : null,
+    tool_name: row.tool_name != null ? String(row.tool_name) : null,
+    tool_input: toolInput,
   };
 
   const common = JobBaseSchema.parse(commonRaw);

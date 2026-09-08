@@ -5,6 +5,10 @@
 import type { Job } from './types';
 
 export function formatContextLine(job: Job): string {
+  if (job.task_type === 'plugin-tool') {
+    return `${job.tool_alias}.${job.tool_name}`;
+  }
+
   const modelPart = job.model ? job.model : '—';
 
   return [job.backend, job.provider, modelPart, job.mode].join(' - ');

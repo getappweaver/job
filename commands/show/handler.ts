@@ -48,10 +48,18 @@ export function handleShowCommand(
           ),
         ]),
     formatRow('description', job.schedule_description),
-    formatRow(
-      'prompt',
-      `${job.prompt.slice(0, 80)}${job.prompt.length > 80 ? '…' : ''}`,
-    ),
+    formatRow('task', job.task_type),
+    ...(job.task_type === 'plugin-tool'
+      ? [
+          formatRow('tool', `${job.tool_alias}.${job.tool_name}`),
+          formatRow('input', JSON.stringify(job.tool_input)),
+        ]
+      : [
+          formatRow(
+            'prompt',
+            `${job.prompt.slice(0, 80)}${job.prompt.length > 80 ? '…' : ''}`,
+          ),
+        ]),
     formatRow('enabled', job.enabled ? 'yes' : 'no'),
     formatRow('next_run', formatNextRun(job.next_run_at)),
     formatRow('backend', job.backend),

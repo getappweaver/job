@@ -4,6 +4,8 @@
 
 import type { Database } from 'bun:sqlite';
 
+import type { SchedulerTaskV2 } from '@src/capabilities/scheduler.v2';
+
 import type { Job, JobDraftInput } from '../types';
 
 import { getNextRunAt, validateSchedule } from './cron-schedule';
@@ -26,8 +28,29 @@ export function getJobRunCount(db: Database, jobId: number): number {
   return Number(row?.c ?? 0);
 }
 
-export function createJob(db: Database, input: JobDraftInput): Job {
+type CreateJobInput = JobDraftInput & { task?: SchedulerTaskV2 };
+
+function storedTask(input: CreateJobInput) {
+  const task = input.task;
+
+  return task?.type === 'plugin-tool'
+    ? {
+        taskType: task.type,
+        toolAlias: task.alias,
+        toolName: task.toolName,
+        toolInputJson: JSON.stringify(task.input),
+      }
+    : {
+        taskType: 'agent-prompt',
+        toolAlias: null,
+        toolName: null,
+        toolInputJson: null,
+      };
+}
+
+export function createJob(db: Database, input: CreateJobInput): Job {
   const now = Date.now();
+  const task = storedTask(input);
 
   if (input.execution_type === 'cron') {
     const validated = validateSchedule(input.schedule);
@@ -58,14 +81,16 @@ export function createJob(db: Database, input: JobDraftInput): Job {
            enabled, created_at, last_run_at, next_run_at,
            backend, provider, model, mode, workspace_target,
            session_id, budget_sats, instructions,
-           execution_type, run_at, max_runs
+            execution_type, run_at, max_runs,
+            task_type, tool_alias, tool_name, tool_input_json
          )
          VALUES (
            $name, $schedule, $scheduleDescription, $prompt,
            1, $createdAt, NULL, $nextRunAt,
            $backend, $provider, $model, $mode, $workspaceTarget,
            NULL, $budgetSats, $instructions,
-           'cron', NULL, $maxRuns
+            'cron', NULL, $maxRuns,
+            $taskType, $toolAlias, $toolName, $toolInputJson
          )`,
       )
       .run({
@@ -83,6 +108,7 @@ export function createJob(db: Database, input: JobDraftInput): Job {
         budgetSats: input.budget_sats,
         instructions: input.instructions,
         maxRuns: input.maxRuns,
+        ...task,
       });
 
     return getJob(db, Number(info.lastInsertRowid))!;
@@ -101,14 +127,16 @@ export function createJob(db: Database, input: JobDraftInput): Job {
            enabled, created_at, last_run_at, next_run_at,
            backend, provider, model, mode, workspace_target,
            session_id, budget_sats, instructions,
-           execution_type, run_at, max_runs
+            execution_type, run_at, max_runs,
+            task_type, tool_alias, tool_name, tool_input_json
          )
          VALUES (
            $name, $schedule, $scheduleDescription, $prompt,
            1, $createdAt, NULL, $nextRunAt,
            $backend, $provider, $model, $mode, $workspaceTarget,
            NULL, $budgetSats, $instructions,
-           'one-time', $runAt, NULL
+            'one-time', $runAt, NULL,
+            $taskType, $toolAlias, $toolName, $toolInputJson
          )`,
     )
     .run({
@@ -126,9 +154,45 @@ export function createJob(db: Database, input: JobDraftInput): Job {
       budgetSats: input.budget_sats,
       instructions: input.instructions,
       runAt: runAtMs,
+      ...task,
     });
 
   return getJob(db, Number(info.lastInsertRowid))!;
+}
+
+export function updateJobTask(
+  db: Database,
+  id: number,
+  task: SchedulerTaskV2,
+): Job | null {
+  const stored =
+    task.type === 'plugin-tool'
+      ? {
+          prompt: `Run plugin tool ${task.alias}.${task.toolName}.`,
+          taskType: task.type,
+          toolAlias: task.alias,
+          toolName: task.toolName,
+          toolInputJson: JSON.stringify(task.input),
+        }
+      : {
+          prompt: task.prompt,
+          taskType: task.type,
+          toolAlias: null,
+          toolName: null,
+          toolInputJson: null,
+        };
+
+  const info = db
+    .prepare(
+      `UPDATE jobs
+       SET prompt = $prompt, task_type = $taskType,
+           tool_alias = $toolAlias, tool_name = $toolName,
+           tool_input_json = $toolInputJson
+       WHERE id = $id`,
+    )
+    .run({ id, ...stored });
+
+  return info.changes > 0 ? getJob(db, id) : null;
 }
 
 export function listJobs(db: Database): Job[] {

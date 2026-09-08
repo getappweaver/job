@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 import { z } from 'zod';
 
+import { SchedulerTaskV2Schema } from '@src/capabilities/scheduler.v2';
 import {
   AgentBackendNameSchema,
   AgentModeSchema,
@@ -64,6 +65,10 @@ export const JobBaseSchema = z.object({
   workspace_target: WorkspaceTargetSchema,
   budget_sats: z.number().nullable(),
   instructions: z.string().nullable(),
+  task_type: z.enum(['agent-prompt', 'plugin-tool']),
+  tool_alias: z.string().nullable(),
+  tool_name: z.string().nullable(),
+  tool_input: z.record(z.string(), z.unknown()).nullable(),
 });
 
 export const CronJobSchema = JobBaseSchema.extend({
@@ -87,6 +92,24 @@ export const JobSchema = z.discriminatedUnion('execution_type', [
 export type CronJob = z.infer<typeof CronJobSchema>;
 export type OneTimeJob = z.infer<typeof OneTimeJobSchema>;
 export type Job = CronJob | OneTimeJob;
+
+export function schedulerTaskForJob(job: Job) {
+  return SchedulerTaskV2Schema.parse(
+    job.task_type === 'plugin-tool'
+      ? {
+          type: 'plugin-tool',
+          alias: job.tool_alias,
+          toolName: job.tool_name,
+          input: job.tool_input,
+        }
+      : {
+          type: 'agent-prompt',
+          prompt: job.prompt,
+          mode: job.mode,
+          workspaceTarget: job.workspace_target,
+        },
+  );
+}
 
 /** Minimal shape needed for getNextRunAt; derived from Job so Job is always assignable. */
 export type GetNextRunAtJob = Pick<

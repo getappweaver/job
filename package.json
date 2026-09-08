@@ -1,16 +1,20 @@
 {
   "name": "appweaver-job-plugin",
-  "version": "4.5.0",
+  "version": "4.6.0",
   "appweaver": {
     "title": "Job scheduler",
     "icon": "./commands/list/renderers/clock.svg",
     "website": "https://github.com/getappweaver/job",
-    "coreApiVersion": "^12.0.0",
+    "coreApiVersion": "^12.7.0",
     "capabilities": {
       "provides": [
         {
           "name": "scheduler",
           "version": 1
+        },
+        {
+          "name": "scheduler",
+          "version": 2
         }
       ],
       "uses": [],

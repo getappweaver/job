@@ -39,7 +39,7 @@ Job creation uses a draft/confirm flow:
 - The bot returns a preview and a Draft ID.
 - Use `/jobs confirm <draft_id>` to create the job, or `/jobs revise <draft_id> <corrections>` to have the AI adjust the draft, or `/jobs discard <draft_id>` to cancel.
 
-Structured `scheduler:v1` capability requests already contain a validated schedule and task, so they create jobs directly without the AI draft flow.
+Structured scheduler capability requests already contain a validated schedule and task, so they create jobs directly without the AI draft flow. `scheduler:v2` additionally supports `plugin-tool` tasks, which execute a validated plugin tool directly without asking an agent to infer or issue the tool call.
 
 ## OpenCode tools
 
@@ -52,9 +52,9 @@ Creation and mutation (confirm, revise, discard, enable, disable, delete) are do
 
 ## Engine and scheduling
 
-- **Engine:** The plugin runs a small scheduler (tick every 60s) that runs due jobs using `runAgent`. The engine is started automatically on first use (e.g. when you run any `/jobs` command). No changes to core `src/` are required.
+- **Engine:** The plugin runs a small scheduler every 60 seconds. Agent-prompt jobs use the configured agent; `scheduler:v2` plugin-tool jobs invoke the target tool directly and have no agent or shell-tool timeout in their execution path.
 - **Long-running jobs:** A job can have only one active run. Later scheduler ticks skip it while it is running, and manual execution reports that it is already active. Missed cron intervals are skipped; the next run is calculated from completion time.
-- **Running a job:** The job prompt is sent to the configured agent, the complete output is stored in `job_runs`, and the result is sent by Nostr DM. Use `/jobs history <id>` for run summaries and `/jobs logs <id>` for timestamped execution and delivery events.
+- **Running a job:** The agent or plugin-tool output is stored in `job_runs`, and the result is sent by Nostr DM and Web Push. Use `/jobs history <id>` for run summaries and `/jobs logs <id>` for timestamped execution and delivery events.
 - **Recovery:** Runs left in `running` state after AppWeaver stops are marked as interrupted when the plugin starts again.
 
 ## Plugin data

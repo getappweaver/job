@@ -22,7 +22,10 @@ import {
 } from './db';
 import { startJobTicker } from './engine';
 import { getJobCommandDefinition, getJobHelpLines } from './help';
-import { jobSchedulerProvider } from './scheduler-provider';
+import {
+  jobSchedulerProvider,
+  jobSchedulerV2Provider,
+} from './scheduler-provider';
 import { jobStories } from './stories';
 
 const pluginDir = import.meta.dir;
@@ -90,5 +93,5 @@ export const JobPlugin: BotPlugin = {
   commandDefinition: (prefix: string, pluginAlias: string) =>
     getJobCommandDefinition(prefix, pluginAlias),
   stories: jobStories,
-  capabilityProviders: [jobSchedulerProvider],
+  capabilityProviders: [jobSchedulerProvider, jobSchedulerV2Provider],
 };
