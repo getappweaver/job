@@ -29,8 +29,13 @@ function coerceStoredProvider(raw: unknown): ProviderName {
 }
 
 /** DB may contain empty or legacy values; JobBaseSchema requires parent|appweaver. */
-function coerceStoredWorkspaceTarget(raw: unknown): WorkspaceTarget {
+function coerceStoredWorkspaceTarget(raw: unknown): WorkspaceTarget | null {
   const s = String(raw ?? '').trim();
+
+  if (s === 'inherit') {
+    return null;
+  }
+
   const parsed = WorkspaceTargetSchema.safeParse(s.length > 0 ? s : undefined);
 
   return parsed.success ? parsed.data : 'parent';
@@ -64,7 +69,12 @@ export function rowToJob(row: Record<string, unknown>): Job {
     backend: String(row.backend ?? ''),
     provider: coerceStoredProvider(row.provider),
     model: String(row.model ?? ''),
-    mode: String(row.mode ?? ''),
+    model_configured: row.model_configured === 1,
+    model_source_id:
+      typeof row.model_source_id === 'string' && row.model_source_id.trim()
+        ? row.model_source_id
+        : null,
+    sticky_session: row.sticky_session === 1,
     workspace_target: coerceStoredWorkspaceTarget(row.workspace_target),
     budget_sats: row.budget_sats != null ? Number(row.budget_sats) : null,
     instructions: row.instructions != null ? String(row.instructions) : null,
@@ -93,6 +103,12 @@ export function rowToJob(row: Record<string, unknown>): Job {
     run_at: null,
     max_runs: row.max_runs != null ? Number(row.max_runs) : null,
     session_id: row.session_id,
+    session_source_id:
+      typeof row.session_source_id === 'string' ? row.session_source_id : null,
+    session_workspace_target:
+      row.session_workspace_target == null
+        ? null
+        : coerceStoredWorkspaceTarget(row.session_workspace_target),
   });
 
   return cron;

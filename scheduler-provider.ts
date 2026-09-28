@@ -9,6 +9,11 @@ import {
   type SchedulerCreateInputV2,
   type SchedulerTaskV2,
 } from '@src/capabilities/scheduler.v2';
+import {
+  SchedulerV3,
+  type SchedulerCreateInputV3,
+  type SchedulerTaskV3,
+} from '@src/capabilities/scheduler.v3';
 import { defineCapabilityProvider } from '@src/capabilities/types';
 import { CapabilityResourceNotFoundError } from '@src/core/capabilities/errors';
 import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
@@ -22,6 +27,7 @@ import {
   getSchedulerResource,
   listSchedulerResources,
   updateJobTask,
+  updateJobDetails,
 } from './db';
 import { getDraft } from './drafts';
 import { JobPluginContext, JobPluginDb } from './init';
@@ -107,16 +113,16 @@ function draftInput(input: SchedulerCreateInputV1): JobDraftInput {
     throw new Error('Job plugin context is not initialized.');
   }
 
-  const defaults = JobPluginContext.agent.getDefaults();
-
   const base = {
     name: input.name,
     prompt: input.task.prompt,
     schedule_description: input.schedule.description,
-    backend: defaults.backend,
-    provider: defaults.provider,
-    model: defaults.model ?? '',
-    mode: input.task.mode,
+    backend: 'opencode',
+    provider: 'local',
+    model: '',
+    model_configured: false,
+    model_source_id: null,
+    sticky_session: false,
     workspace_target: input.task.workspaceTarget,
     budget_sats: null,
     instructions: null,
@@ -143,8 +149,6 @@ function draftInputV2(input: SchedulerCreateInputV2): SchedulerV2JobInput {
     throw new Error('Job plugin context is not initialized.');
   }
 
-  const defaults = JobPluginContext.agent.getDefaults();
-
   const prompt =
     input.task.type === 'agent-prompt'
       ? input.task.prompt
@@ -154,10 +158,12 @@ function draftInputV2(input: SchedulerCreateInputV2): SchedulerV2JobInput {
     name: input.name,
     prompt,
     schedule_description: input.schedule.description,
-    backend: defaults.backend,
-    provider: defaults.provider,
-    model: defaults.model ?? '',
-    mode: 'agent',
+    backend: 'opencode',
+    provider: 'local',
+    model: '',
+    model_configured: false,
+    model_source_id: null,
+    sticky_session: false,
     workspace_target: 'appweaver',
     budget_sats: null,
     instructions: null,
@@ -457,6 +463,236 @@ export const jobSchedulerV2Provider = defineCapabilityProvider({
       }
 
       return jobSummaryV2(providerId, input.resourceId, job);
+    },
+  },
+});
+
+function taskV3(job: Job): SchedulerTaskV3 {
+  if (job.task_type === 'plugin-tool') {
+    return {
+      type: 'plugin-tool',
+      alias: job.tool_alias!,
+      toolName: job.tool_name!,
+      input: job.tool_input ?? {},
+    };
+  }
+
+  return {
+    type: 'agent-prompt',
+    prompt: job.prompt,
+    workspaceTarget: job.workspace_target,
+    modelSourceId: job.model_source_id,
+    modelId: job.model_configured ? job.model : null,
+    stickySession: job.sticky_session,
+  };
+}
+
+function summaryV3(providerId: string, resourceId: string, job: Job) {
+  return {
+    resource: {
+      capability: { name: 'scheduler', version: 3 },
+      providerId,
+      resourceType: 'schedule',
+      resourceId,
+    },
+    status: 'created' as const,
+    name: job.name,
+    enabled: Boolean(job.enabled),
+    scheduleDescription: job.schedule_description,
+    nextRunAt: job.next_run_at,
+    task: taskV3(job),
+  };
+}
+
+function draftInputV3(input: SchedulerCreateInputV3) {
+  const base = {
+    name: input.name,
+    prompt:
+      input.task.type === 'agent-prompt'
+        ? input.task.prompt
+        : `Run plugin tool ${input.task.alias}.${input.task.toolName}.`,
+    schedule_description: input.schedule.description,
+    backend: 'opencode',
+    provider: 'local',
+    model: input.task.type === 'agent-prompt' ? (input.task.modelId ?? '') : '',
+    model_configured:
+      input.task.type === 'agent-prompt' && input.task.modelId !== null,
+    model_source_id:
+      input.task.type === 'agent-prompt' ? input.task.modelSourceId : null,
+    workspace_target:
+      input.task.type === 'agent-prompt' ? input.task.workspaceTarget : null,
+    sticky_session:
+      input.task.type === 'agent-prompt' ? input.task.stickySession : false,
+    budget_sats: null,
+    instructions: null,
+    task: input.task,
+  } as const;
+
+  return input.schedule.type === 'cron'
+    ? {
+        ...base,
+        execution_type: 'cron' as const,
+        schedule: input.schedule.expression,
+        maxRuns: input.schedule.maxRuns,
+      }
+    : {
+        ...base,
+        execution_type: 'one-time' as const,
+        run_at: input.schedule.runAt,
+      };
+}
+
+export const jobSchedulerV3Provider = defineCapabilityProvider({
+  contract: SchedulerV3,
+  operations: {
+    [SchedulerV3.operations.create.id]: async ({ input, providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+
+      const create = db.transaction(() => {
+        const job = createJob(db, draftInputV3(input));
+
+        if (!input.enabled) {
+          disableJob(db, job.id);
+        }
+
+        const resourceId = createSchedulerResourceForJob({
+          db,
+          jobId: job.id,
+          enabled: input.enabled,
+        });
+
+        return { job: getJob(db, job.id) ?? job, resourceId };
+      });
+
+      const created = create();
+
+      return {
+        ...summaryV3(providerId, created.resourceId, created.job),
+        review: null,
+      };
+    },
+    [SchedulerV3.operations.list.id]: async ({ providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+
+      const jobs = listSchedulerResources(db).flatMap((mapping) => {
+        const job = mapping.jobId === null ? null : getJob(db, mapping.jobId);
+
+        return job ? [{ resourceId: mapping.resourceId, job }] : [];
+      });
+
+      return {
+        schedules: jobs.map(({ resourceId, job }) =>
+          summaryV3(providerId, resourceId, job),
+        ),
+        view: renderJobListComponent({
+          command: alias,
+          prefix: '/',
+          jobs: jobs.map(({ job }) => job),
+        }),
+      };
+    },
+    [SchedulerV3.operations.show.id]: async ({ input, providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const mapping = getSchedulerResource(JobPluginDb, input.resourceId);
+      const job = mapping?.jobId ? getJob(JobPluginDb, mapping.jobId) : null;
+
+      if (!job) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV3.capability,
+          input.resourceId,
+        );
+      }
+
+      return {
+        ...summaryV3(providerId, input.resourceId, job),
+        view: renderJobListComponent({
+          command: alias,
+          prefix: '/',
+          jobs: [job],
+        }),
+      };
+    },
+    [SchedulerV3.operations['update-task'].id]: async ({
+      input,
+      providerId,
+    }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const mapping = getSchedulerResource(db, input.resourceId);
+
+      if (!mapping?.jobId) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV3.capability,
+          input.resourceId,
+        );
+      }
+
+      const update = db.transaction(() => {
+        const previous = getJob(db, mapping.jobId!);
+
+        if (!previous) {
+          throw new CapabilityResourceNotFoundError(
+            SchedulerV3.capability,
+            input.resourceId,
+          );
+        }
+
+        updateJobTask(db, previous.id, input.task);
+
+        return updateJobDetails({
+          db,
+          id: previous.id,
+          name: previous.name,
+          prompt:
+            input.task.type === 'agent-prompt'
+              ? input.task.prompt
+              : previous.prompt,
+          model:
+            input.task.type === 'agent-prompt'
+              ? (input.task.modelId ?? '')
+              : '',
+          modelConfigured:
+            input.task.type === 'agent-prompt' && input.task.modelId !== null,
+          modelSourceId:
+            input.task.type === 'agent-prompt'
+              ? input.task.modelSourceId
+              : null,
+          workspaceTarget:
+            input.task.type === 'agent-prompt'
+              ? input.task.workspaceTarget
+              : null,
+          stickySession:
+            input.task.type === 'agent-prompt'
+              ? input.task.stickySession
+              : false,
+          instructions: previous.instructions,
+        });
+      });
+
+      const job = update();
+
+      if (!job) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV3.capability,
+          input.resourceId,
+        );
+      }
+
+      return summaryV3(providerId, input.resourceId, job);
     },
   },
 });

@@ -26,8 +26,10 @@ export function formatCreateWithPreview(
     `${'description'.padEnd(w)} : ${input.schedule_description}`,
     `${'backend'.padEnd(w)} : ${input.backend}`,
     `${'provider'.padEnd(w)} : ${input.provider}`,
-    `${'model'.padEnd(w)} : ${input.model}`,
-    `${'mode'.padEnd(w)} : ${input.mode}`,
+    `${'model'.padEnd(w)} : ${input.model_configured ? input.model : '(inherit)'}`,
+    `${'source'.padEnd(w)} : ${input.model_source_id ?? '(inherit)'}`,
+    `${'workspace'.padEnd(w)} : ${input.workspace_target ?? '(inherit)'}`,
+    `${'sticky'.padEnd(w)} : ${input.sticky_session ? 'yes' : 'no'}`,
     `${'budget_sats'.padEnd(w)} : ${input.budget_sats ?? '—'}`,
     `${'instructions'.padEnd(w)} : ${input.instructions ?? '—'}`,
   ];

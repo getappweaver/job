@@ -28,8 +28,10 @@ const scheduledJob = {
   next_run_at: 1714381200000,
   backend: 'opencode',
   provider: 'local',
-  model: 'default',
-  mode: 'agent',
+  model: '',
+  model_configured: false,
+  model_source_id: null,
+  sticky_session: false,
   workspace_target: 'appweaver',
   budget_sats: null,
   instructions:
@@ -41,6 +43,8 @@ const scheduledJob = {
   run_at: null,
   max_runs: null,
   session_id: null,
+  session_source_id: null,
+  session_workspace_target: null,
 } satisfies Job;
 
 const aiPromptText =
@@ -55,9 +59,7 @@ name         : Morning priority brief
 prompt       : Review open todos, identify the three highest priority items, and send a concise morning brief.
 description  : Every weekday at 09:00
 backend      : opencode
-provider     : local
-model        : default
-mode         : agent
+model        : (inherit)
 budget_sats  : -
 instructions : Keep the brief actionable and include only items that can be started today.
 

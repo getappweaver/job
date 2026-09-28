@@ -19,8 +19,12 @@ export function createJobTables(db: Database): void {
       backend            TEXT    NOT NULL,
       provider           TEXT    NOT NULL,
       model              TEXT    NOT NULL,
-      mode               TEXT    NOT NULL,
+      model_configured   INTEGER NOT NULL DEFAULT 0,
       workspace_target   TEXT    NOT NULL,
+      model_source_id    TEXT,
+      sticky_session     INTEGER NOT NULL DEFAULT 0,
+      session_source_id  TEXT,
+      session_workspace_target TEXT,
       session_id         TEXT,
       budget_sats        INTEGER,
       instructions       TEXT,
@@ -33,6 +37,22 @@ export function createJobTables(db: Database): void {
   const jobColumns = db.query('PRAGMA table_info(jobs)').all() as Array<{
     name: string;
   }>;
+
+  if (jobColumns.some((column) => column.name === 'mode')) {
+    db.run('ALTER TABLE jobs DROP COLUMN mode');
+  }
+
+  for (const [name, type] of [
+    ['model_source_id', 'TEXT'],
+    ['model_configured', 'INTEGER NOT NULL DEFAULT 0'],
+    ['sticky_session', 'INTEGER NOT NULL DEFAULT 0'],
+    ['session_source_id', 'TEXT'],
+    ['session_workspace_target', 'TEXT'],
+  ] as const) {
+    if (!jobColumns.some((column) => column.name === name)) {
+      db.run(`ALTER TABLE jobs ADD COLUMN ${name} ${type}`);
+    }
+  }
 
   if (!jobColumns.some((column) => column.name === 'task_type')) {
     db.run(
@@ -108,7 +128,10 @@ export function createJobTables(db: Database): void {
     'CREATE INDEX IF NOT EXISTS idx_job_run_logs_run_time ON job_run_logs(run_id, occurred_at, id)',
   );
 
-  db.run("UPDATE jobs SET backend = 'cursor' WHERE backend = 'cursor-sdk'");
+  db.run(
+    "UPDATE jobs SET backend = 'opencode' WHERE backend IN ('cursor', 'cursor-sdk')",
+  );
+
   db.run("UPDATE jobs SET backend = 'opencode' WHERE backend = 'opencode-sdk'");
 }
 

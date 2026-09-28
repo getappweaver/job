@@ -27,6 +27,7 @@ Scheduled job management: cron and one-time jobs, drafts, and AI-assisted creati
 | `/jobs history <id> [N]` | Show run history for a job (default N=10) |
 | `/jobs logs <id> [run-id]` | Show complete chronological execution logs for a job or run |
 | `/jobs run <id>` | Run job once now (result stored in job history) |
+| `/jobs update <id> --model-source ppq --model private/gpt-oss-120b` | Pin a job to another model source and model |
 | `/jobs help` | Show command summary |
 
 In the web Jobs widget, use **Show logs** from a job's ⋮ menu to open its complete execution log in a modal. Newest runs appear first, while events inside each run remain chronological. OpenCode backend status, tool commands, completion output, and backend errors are recorded while a run is active; use **Refresh** to load new events. Messages and structured details are not truncated.
@@ -53,6 +54,9 @@ Creation and mutation (confirm, revise, discard, enable, disable, delete) are do
 ## Engine and scheduling
 
 - **Engine:** The plugin runs a small scheduler every 60 seconds. Agent-prompt jobs use the configured agent; `scheduler:v2` plugin-tool jobs invoke the target tool directly and have no agent or shell-tool timeout in their execution path.
+- **Model routing:** A job may pin a workspace, model source, and model. Unset options inherit the workspace and current source/model on every run. Core and PPQ jobs can run concurrently in separate sessions; different models of the same source share its OpenCode server. Source servers stay open until AppWeaver exits. `scheduler:v3` exposes these options to other plugins; V1/V2 keep their existing task shapes.
+- **Sessions:** Jobs start a fresh session on every run by default. `/jobs update <id> --sticky-session true` reuses the session on later runs. Changing the resolved source or workspace starts a fresh session instead of resuming on the wrong server.
+- Existing jobs keep their saved data. The plugin adds optional/defaulted SQLite columns; historical `model` values are not treated as new model overrides unless explicitly configured.
 - **Long-running jobs:** A job can have only one active run. Later scheduler ticks skip it while it is running, and manual execution reports that it is already active. Missed cron intervals are skipped; the next run is calculated from completion time.
 - **Running a job:** The agent or plugin-tool output is stored in `job_runs`, and the result is sent by Nostr DM and Web Push. Use `/jobs history <id>` for run summaries and `/jobs logs <id>` for timestamped execution and delivery events.
 - **Recovery:** Runs left in `running` state after AppWeaver stops are marked as interrupted when the plugin starts again.

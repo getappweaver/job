@@ -9,9 +9,9 @@ export function formatContextLine(job: Job): string {
     return `${job.tool_alias}.${job.tool_name}`;
   }
 
-  const modelPart = job.model ? job.model : '—';
+  const modelPart = job.model_configured ? job.model : '—';
 
-  return [job.backend, job.provider, modelPart, job.mode].join(' - ');
+  return [job.backend, modelPart].join(' - ');
 }
 
 export function formatNextRun(nextRunAt: number | null): string {

@@ -4,9 +4,10 @@
 
 import type { Database } from 'bun:sqlite';
 
-import type { PluginContext, PluginIdentity } from '@src/core/plugin';
+import type { PluginIdentity } from '@src/core/plugin';
 import type { MessageSource } from '@src/messaging';
 
+import type { JobCommandContext } from '../../command-context';
 import { createDraftSessionId, storeDraft } from '../../drafts';
 import type { JobDraftInput } from '../../types';
 
@@ -20,7 +21,7 @@ export type HandleJobAiProps = {
   source: MessageSource;
   identity: PluginIdentity;
   pluginDb: Database;
-  ctx: PluginContext;
+  ctx: JobCommandContext;
 };
 
 export async function handleJobAi({

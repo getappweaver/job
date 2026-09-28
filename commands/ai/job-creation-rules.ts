@@ -8,7 +8,7 @@ const JOB_CREATION_RULES = [
   'For cron jobs, `schedule` must be a valid 5-field cron expression.',
   'Use `maxRuns: null` unless the user clearly asked for a limit.',
   'Use `budget_sats: null` unless the user clearly asked for a budget.',
-  'Do NOT include backend/provider/model/mode/workspace_target in the create payload; those are system-managed.',
+  'Do NOT include backend/provider/model/workspace_target in the create payload; those are system-managed.',
 ] as const;
 
 const JOB_PAYLOAD_FIELD_RULES = [

@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v4.7.0] - 2026-09-28
+
+- feat: supports scheduler.v3, with model-source selection etc (1375781)
+
 ## [v4.6.0] - 2026-09-08
 
-- feat: supporting scheduler.v2 capability (c65250e)
+- feat: supporting scheduler.v2 capability (3ae40d6)
 
 ## [v4.5.0] - 2026-08-27
 

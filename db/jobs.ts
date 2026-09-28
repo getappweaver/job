@@ -5,6 +5,7 @@
 import type { Database } from 'bun:sqlite';
 
 import type { SchedulerTaskV2 } from '@src/capabilities/scheduler.v2';
+import type { SchedulerTaskV3 } from '@src/capabilities/scheduler.v3';
 
 import type { Job, JobDraftInput } from '../types';
 
@@ -16,6 +17,10 @@ type UpdateJobDetailsProps = {
   id: number;
   name: string;
   model: string;
+  modelConfigured: boolean;
+  modelSourceId: string | null;
+  workspaceTarget: 'parent' | 'appweaver' | null;
+  stickySession: boolean;
   prompt: string;
   instructions: string | null;
 };
@@ -28,7 +33,15 @@ export function getJobRunCount(db: Database, jobId: number): number {
   return Number(row?.c ?? 0);
 }
 
-type CreateJobInput = JobDraftInput & { task?: SchedulerTaskV2 };
+type WithOptionalExecutionSettings<T> = T extends JobDraftInput
+  ? Omit<T, 'model_source_id' | 'sticky_session' | 'model_configured'> &
+      Partial<
+        Pick<T, 'model_source_id' | 'sticky_session' | 'model_configured'>
+      >
+  : never;
+type CreateJobInput = WithOptionalExecutionSettings<JobDraftInput> & {
+  task?: SchedulerTaskV2 | SchedulerTaskV3;
+};
 
 function storedTask(input: CreateJobInput) {
   const task = input.task;
@@ -79,7 +92,7 @@ export function createJob(db: Database, input: CreateJobInput): Job {
         `INSERT INTO jobs (
            name, schedule, schedule_description, prompt,
            enabled, created_at, last_run_at, next_run_at,
-           backend, provider, model, mode, workspace_target,
+              backend, provider, model, model_configured, workspace_target, model_source_id, sticky_session,
            session_id, budget_sats, instructions,
             execution_type, run_at, max_runs,
             task_type, tool_alias, tool_name, tool_input_json
@@ -87,7 +100,7 @@ export function createJob(db: Database, input: CreateJobInput): Job {
          VALUES (
            $name, $schedule, $scheduleDescription, $prompt,
            1, $createdAt, NULL, $nextRunAt,
-           $backend, $provider, $model, $mode, $workspaceTarget,
+              $backend, $provider, $model, $modelConfigured, $workspaceTarget, $modelSourceId, $stickySession,
            NULL, $budgetSats, $instructions,
             'cron', NULL, $maxRuns,
             $taskType, $toolAlias, $toolName, $toolInputJson
@@ -103,8 +116,10 @@ export function createJob(db: Database, input: CreateJobInput): Job {
         backend: input.backend,
         provider: input.provider,
         model: input.model,
-        mode: input.mode,
-        workspaceTarget: input.workspace_target,
+        modelConfigured: input.model_configured ? 1 : 0,
+        workspaceTarget: input.workspace_target ?? 'inherit',
+        modelSourceId: input.model_source_id ?? null,
+        stickySession: input.sticky_session ? 1 : 0,
         budgetSats: input.budget_sats,
         instructions: input.instructions,
         maxRuns: input.maxRuns,
@@ -125,7 +140,7 @@ export function createJob(db: Database, input: CreateJobInput): Job {
       `INSERT INTO jobs (
            name, schedule, schedule_description, prompt,
            enabled, created_at, last_run_at, next_run_at,
-           backend, provider, model, mode, workspace_target,
+             backend, provider, model, model_configured, workspace_target, model_source_id, sticky_session,
            session_id, budget_sats, instructions,
             execution_type, run_at, max_runs,
             task_type, tool_alias, tool_name, tool_input_json
@@ -133,7 +148,7 @@ export function createJob(db: Database, input: CreateJobInput): Job {
          VALUES (
            $name, $schedule, $scheduleDescription, $prompt,
            1, $createdAt, NULL, $nextRunAt,
-           $backend, $provider, $model, $mode, $workspaceTarget,
+             $backend, $provider, $model, $modelConfigured, $workspaceTarget, $modelSourceId, $stickySession,
            NULL, $budgetSats, $instructions,
             'one-time', $runAt, NULL,
             $taskType, $toolAlias, $toolName, $toolInputJson
@@ -149,8 +164,10 @@ export function createJob(db: Database, input: CreateJobInput): Job {
       backend: input.backend,
       provider: input.provider,
       model: input.model,
-      mode: input.mode,
-      workspaceTarget: input.workspace_target,
+      modelConfigured: input.model_configured ? 1 : 0,
+      workspaceTarget: input.workspace_target ?? 'inherit',
+      modelSourceId: input.model_source_id ?? null,
+      stickySession: input.sticky_session ? 1 : 0,
       budgetSats: input.budget_sats,
       instructions: input.instructions,
       runAt: runAtMs,
@@ -163,7 +180,7 @@ export function createJob(db: Database, input: CreateJobInput): Job {
 export function updateJobTask(
   db: Database,
   id: number,
-  task: SchedulerTaskV2,
+  task: SchedulerTaskV2 | SchedulerTaskV3,
 ): Job | null {
   const stored =
     task.type === 'plugin-tool'
@@ -217,16 +234,35 @@ export function updateJobDetails({
   id,
   name,
   model,
+  modelConfigured,
+  modelSourceId,
+  workspaceTarget,
+  stickySession,
   prompt,
   instructions,
 }: UpdateJobDetailsProps): Job | null {
   const info = db
     .prepare(
       `UPDATE jobs
-       SET name = $name, model = $model, prompt = $prompt, instructions = $instructions
+        SET name = $name, model = $model, model_configured = $modelConfigured, model_source_id = $modelSourceId,
+            workspace_target = $workspaceTarget, sticky_session = $stickySession,
+            session_id = CASE WHEN sticky_session != $stickySession OR model_source_id IS NOT $modelSourceId OR workspace_target != $workspaceTarget THEN NULL ELSE session_id END,
+            session_source_id = CASE WHEN sticky_session != $stickySession OR model_source_id IS NOT $modelSourceId OR workspace_target != $workspaceTarget THEN NULL ELSE session_source_id END,
+            session_workspace_target = CASE WHEN sticky_session != $stickySession OR model_source_id IS NOT $modelSourceId OR workspace_target != $workspaceTarget THEN NULL ELSE session_workspace_target END,
+            prompt = $prompt, instructions = $instructions
        WHERE id = $id`,
     )
-    .run({ id, name, model, prompt, instructions });
+    .run({
+      id,
+      name,
+      model,
+      modelConfigured: modelConfigured ? 1 : 0,
+      modelSourceId,
+      workspaceTarget: workspaceTarget ?? 'inherit',
+      stickySession: stickySession ? 1 : 0,
+      prompt,
+      instructions,
+    });
 
   return info.changes > 0 ? getJob(db, id) : null;
 }
@@ -237,12 +273,24 @@ export function deleteJob(db: Database, id: number): boolean {
   return info.changes > 0;
 }
 
-export function updateJobSessionId(
-  db: Database,
-  id: number,
-  sessionId: string,
-): void {
-  db.prepare('UPDATE jobs SET session_id = ? WHERE id = ?').run(sessionId, id);
+type UpdateJobSessionIdProps = {
+  db: Database;
+  id: number;
+  sessionId: string;
+  sourceId: string;
+  workspaceTarget: 'parent' | 'appweaver';
+};
+
+export function updateJobSessionId({
+  db,
+  id,
+  sessionId,
+  sourceId,
+  workspaceTarget,
+}: UpdateJobSessionIdProps): void {
+  db.prepare(
+    'UPDATE jobs SET session_id = ?, session_source_id = ?, session_workspace_target = ? WHERE id = ?',
+  ).run(sessionId, sourceId, workspaceTarget, id);
 }
 
 export function enableJob(db: Database, id: number): boolean {

@@ -4,8 +4,6 @@
 
 import type { Database } from 'bun:sqlite';
 
-import type { PluginAgentService } from '@src/core/plugin';
-
 import { getJob, listJobs } from '../../db';
 import { createDraftSessionId, storeDraft } from '../../drafts';
 import { formatContextLine, formatNextRun } from '../../format';
@@ -78,7 +76,6 @@ function formatJobDetail(db: Database, id: number): string {
     `Backend: ${job.backend}`,
     `Provider: ${job.provider}`,
     `Model: ${job.model || '(default)'}`,
-    `Mode: ${job.mode}`,
     `Budget: ${job.budget_sats != null ? `${job.budget_sats} sats (auto-flow)` : '—'}`,
     `Instructions: ${job.instructions != null ? job.instructions.slice(0, 120) + (job.instructions.length > 120 ? '…' : '') : '—'}`,
   ];
@@ -101,13 +98,11 @@ export async function executeTool({
   call,
   db,
   prefix,
-  agent,
 }: {
   alias: string;
   call: JobToolCall;
   db: Database;
   prefix: string;
-  agent: PluginAgentService;
 }): Promise<string> {
   switch (call.type) {
     case 'list':
@@ -117,15 +112,15 @@ export async function executeTool({
     case 'context':
       return formatCurrentTimeContext();
     case 'create': {
-      const defaults = agent.getDefaults();
-
       const fullInput = JobDraftInputSchema.parse({
         ...call.input,
-        backend: defaults.backend,
-        provider: defaults.provider,
-        model: defaults.model ?? '',
-        mode: defaults.mode,
-        workspace_target: defaults.workspaceTarget,
+        backend: 'opencode',
+        provider: 'local',
+        model: '',
+        model_configured: false,
+        model_source_id: null,
+        workspace_target: null,
+        sticky_session: false,
       });
 
       const draftId = storeDraft(db, {

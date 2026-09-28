@@ -20,10 +20,6 @@ export async function generateCreateWithParams({
   const result = await agent.run({
     prompt: systemPrompt,
     sessionId: null,
-    backend: null,
-    provider: null,
-    model: null,
-    mode: null,
     workspaceTarget: null,
     cwd: null,
     onAgentStreamChunk: null,
@@ -39,7 +35,7 @@ export async function generateCreateWithParams({
 
   if (!raw || raw === '(no output)') {
     throw new Error(
-      'Model returned no text. Try again or use a different backend (e.g. cursor).',
+      'Model returned no text. Try again with a different model.',
     );
   }
 
@@ -67,15 +63,15 @@ export async function generateCreateWithParams({
 
   const promptInput = JobDraftPromptInputSchema.parse(parsed);
 
-  const defaults = agent.getDefaults();
-
   const fullInput = {
     ...promptInput,
-    backend: defaults.backend,
-    provider: defaults.provider,
-    model: defaults.model ?? '',
-    mode: defaults.mode,
-    workspace_target: defaults.workspaceTarget,
+    backend: 'opencode',
+    provider: 'local',
+    model: '',
+    model_configured: false,
+    model_source_id: null,
+    workspace_target: null,
+    sticky_session: false,
   };
 
   return JobDraftInputSchema.parse(fullInput);

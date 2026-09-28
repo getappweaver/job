@@ -8,6 +8,9 @@ type HandleUpdateCommandProps = {
   id: number;
   name: string | undefined;
   model: string | undefined;
+  modelSource: string | undefined;
+  workspace: string | undefined;
+  stickySession: string | undefined;
   prompt: string | undefined;
   instructions: string | undefined;
 };
@@ -23,6 +26,9 @@ export function handleUpdateCommand({
   id,
   name,
   model,
+  modelSource,
+  workspace,
+  stickySession,
   prompt,
   instructions,
 }: HandleUpdateCommandProps): UpdateJobResult {
@@ -35,6 +41,9 @@ export function handleUpdateCommand({
   const hasUpdates =
     name !== undefined ||
     model !== undefined ||
+    modelSource !== undefined ||
+    workspace !== undefined ||
+    stickySession !== undefined ||
     prompt !== undefined ||
     instructions !== undefined;
 
@@ -53,6 +62,28 @@ export function handleUpdateCommand({
     return { job: current, updated: false, error: 'Job prompt is required.' };
   }
 
+  if (
+    workspace !== undefined &&
+    !['inherit', 'parent', 'appweaver'].includes(workspace)
+  ) {
+    return {
+      job: current,
+      updated: false,
+      error: 'Workspace must be inherit, parent, or appweaver.',
+    };
+  }
+
+  if (
+    stickySession !== undefined &&
+    !['true', 'false'].includes(stickySession)
+  ) {
+    return {
+      job: current,
+      updated: false,
+      error: 'Sticky session must be true or false.',
+    };
+  }
+
   const updated = updateJobDetails({
     db,
     id,
@@ -63,6 +94,26 @@ export function handleUpdateCommand({
         : model.trim() === 'reset'
           ? ''
           : model.trim(),
+    modelConfigured:
+      model === undefined
+        ? current.model_configured
+        : model.trim() !== 'reset' && model.trim() !== '',
+    modelSourceId:
+      modelSource === undefined
+        ? current.model_source_id
+        : modelSource.trim() === 'inherit' || modelSource.trim() === 'reset'
+          ? null
+          : modelSource.trim(),
+    workspaceTarget:
+      workspace === undefined
+        ? current.workspace_target
+        : workspace === 'inherit'
+          ? null
+          : (workspace as 'parent' | 'appweaver'),
+    stickySession:
+      stickySession === undefined
+        ? current.sticky_session
+        : stickySession === 'true',
     prompt: nextPrompt,
     instructions:
       instructions === undefined

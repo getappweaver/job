@@ -10,8 +10,8 @@ import type {
   AgentStreamChunk,
   AgentToolCall,
 } from '@src/backends/agent-stream-chunk';
-import { getOutputString, type AgentRunResult } from '@src/backends/types';
-import type { PluginContext } from '@src/core/plugin';
+import { getOutputString } from '@src/backends/types';
+import type { PluginAgentRunResult, PluginContext } from '@src/core/plugin';
 import { log } from '@src/logger';
 
 import {
@@ -648,8 +648,7 @@ async function runJobOnce({
           scheduledFor === null ? null : Math.max(0, startedAt - scheduledFor),
         backend: job.backend,
         provider: job.provider,
-        model: job.model,
-        mode: job.mode,
+        model: job.model_configured ? job.model : null,
         workspace_target: job.workspace_target,
       },
       occurredAt: startedAt,
@@ -690,21 +689,47 @@ async function runJobOnce({
       ? `${executionPreamble}\n\nAdditional instructions:\n${job.instructions}\n\nJob request:\n${job.prompt}`
       : `${executionPreamble}\n\nJob request:\n${job.prompt}`;
 
+  const workspaceTarget =
+    job.workspace_target ?? ctx.workspace.getActiveTarget();
+
+  const requestedSource = job.model_source_id;
+
+  const provider = requestedSource
+    ? ctx.capabilities
+        .listProviders({ name: 'ai-model-source', version: 1 })
+        .filter(
+          (entry) =>
+            entry.source.alias === requestedSource ||
+            entry.providerId === requestedSource,
+        )
+    : null;
+
+  if (provider && provider.length !== 1) {
+    throw new Error(`Unknown or ambiguous model source: ${requestedSource}`);
+  }
+
+  const sourceId =
+    provider?.[0].providerId ??
+    ctx.modelSource.getActiveProviderId(workspaceTarget);
+
   const existingSessionId =
-    job.execution_type === 'cron' ? job.session_id : null;
+    job.execution_type === 'cron' &&
+    job.sticky_session &&
+    job.session_source_id === sourceId &&
+    job.session_workspace_target === workspaceTarget
+      ? job.session_id
+      : null;
 
   let sessionId = existingSessionId;
-  let result: AgentRunResult;
+  let result: PluginAgentRunResult;
 
   try {
     result = await ctx.agent.run({
       prompt: effectiveContent,
       sessionId,
-      backend: job.backend,
-      provider: job.provider,
-      model: job.model || null,
-      mode: job.mode,
-      workspaceTarget: job.workspace_target,
+      workspaceTarget,
+      modelSourceId: sourceId,
+      modelId: job.model_configured ? job.model : null,
       cwd: null,
       onAgentStreamChunk,
       abortSignal: streamAbortController.signal,
@@ -768,7 +793,7 @@ async function runJobOnce({
       details:
         result.type === 'success'
           ? {
-              model: result.model ?? job.model,
+              model: result.model ?? (job.model_configured ? job.model : null),
               tokens: result.tokens ?? null,
               cost: result.cost ?? null,
             }
@@ -776,8 +801,14 @@ async function runJobOnce({
       occurredAt: Date.now(),
     });
 
-    if (job.execution_type === 'cron' && job.session_id == null) {
-      updateJobSessionId(pluginDb, job.id, sessionId!);
+    if (job.execution_type === 'cron' && job.sticky_session && success) {
+      updateJobSessionId({
+        db: pluginDb,
+        id: job.id,
+        sessionId: sessionId!,
+        sourceId: result.modelSourceId,
+        workspaceTarget,
+      });
     }
 
     finishJobRun({

@@ -25,6 +25,7 @@ import { getJobCommandDefinition, getJobHelpLines } from './help';
 import {
   jobSchedulerProvider,
   jobSchedulerV2Provider,
+  jobSchedulerV3Provider,
 } from './scheduler-provider';
 import { jobStories } from './stories';
 
@@ -68,7 +69,9 @@ export const JobPlugin: BotPlugin = {
       ctx: {
         ...JobPluginContext,
         agent: context.agent,
-        promptFn: context.promptFn ?? JobPluginContext.promptFn,
+        promptFn:
+          context.promptFn ??
+          (() => Promise.reject(new Error('Interactive prompt unavailable.'))),
         sendReply: context.sendReply ?? JobPluginContext.sendReply,
       },
       identity: JobPlugin.identity,
@@ -93,5 +96,9 @@ export const JobPlugin: BotPlugin = {
   commandDefinition: (prefix: string, pluginAlias: string) =>
     getJobCommandDefinition(prefix, pluginAlias),
   stories: jobStories,
-  capabilityProviders: [jobSchedulerProvider, jobSchedulerV2Provider],
+  capabilityProviders: [
+    jobSchedulerProvider,
+    jobSchedulerV2Provider,
+    jobSchedulerV3Provider,
+  ],
 };

@@ -1,9 +1,10 @@
 import type { Database } from 'bun:sqlite';
 
-import type { PluginContext, PluginIdentity } from '@src/core/plugin';
+import type { PluginIdentity } from '@src/core/plugin';
 import type { MessageSource } from '@src/messaging';
 import type { ParsedCliInvocation } from '@src/system/parser-cli';
 
+import type { JobCommandContext } from '../command-context';
 import type { getJobCommandDefinition } from '../help';
 
 export type JobCommandAdapterParams = {
@@ -13,6 +14,6 @@ export type JobCommandAdapterParams = {
   command: ReturnType<typeof getJobCommandDefinition>;
   db: Database;
   source: MessageSource;
-  ctx: PluginContext;
+  ctx: JobCommandContext;
   identity: PluginIdentity;
 };

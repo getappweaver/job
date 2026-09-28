@@ -1,10 +1,11 @@
 import type { Database } from 'bun:sqlite';
 
-import type { PluginContext, PluginIdentity } from '@src/core/plugin';
+import type { PluginIdentity } from '@src/core/plugin';
 import type { MessageSource } from '@src/messaging';
 import { parseCliInput, parseStructuredInput } from '@src/system/parser-cli';
 import type { WebNodeRoot } from '@src/web/ui-schema';
 
+import type { JobCommandContext } from './command-context';
 import { adaptAiCommand } from './commands/ai/adapter';
 import { adaptConfirmCommand } from './commands/confirm/adapter';
 import { adaptDeleteCommand } from './commands/delete/adapter';
@@ -137,7 +138,7 @@ export async function handleJob(params: {
   source: MessageSource;
   jsonPayload: unknown;
   db: Database;
-  ctx: PluginContext;
+  ctx: JobCommandContext;
   identity: PluginIdentity;
 }): Promise<string | WebNodeRoot> {
   const normalizedArgs = params.args.length === 0 ? ['help'] : params.args;

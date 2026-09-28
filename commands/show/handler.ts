@@ -64,8 +64,10 @@ export function handleShowCommand(
     formatRow('next_run', formatNextRun(job.next_run_at)),
     formatRow('backend', job.backend),
     formatRow('provider', job.provider),
-    formatRow('model', job.model || '(default)'),
-    formatRow('mode', job.mode),
+    formatRow('source', job.model_source_id ?? '(inherit)'),
+    formatRow('workspace', job.workspace_target ?? '(inherit)'),
+    formatRow('model', job.model_configured ? job.model : '(inherit)'),
+    formatRow('sticky', job.sticky_session ? 'yes' : 'no'),
     formatRow(
       'budget',
       job.budget_sats != null ? `${job.budget_sats} sats (auto-flow)` : '—',

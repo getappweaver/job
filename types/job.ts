@@ -8,7 +8,6 @@ import { z } from 'zod';
 import { SchedulerTaskV2Schema } from '@src/capabilities/scheduler.v2';
 import {
   AgentBackendNameSchema,
-  AgentModeSchema,
   ProviderNameSchema,
   WorkspaceTargetSchema,
 } from '@src/db';
@@ -61,8 +60,10 @@ export const JobBaseSchema = z.object({
   backend: AgentBackendNameSchema,
   provider: ProviderNameSchema,
   model: z.string(),
-  mode: AgentModeSchema,
-  workspace_target: WorkspaceTargetSchema,
+  model_configured: z.boolean(),
+  model_source_id: z.string().nullable(),
+  sticky_session: z.boolean(),
+  workspace_target: WorkspaceTargetSchema.nullable(),
   budget_sats: z.number().nullable(),
   instructions: z.string().nullable(),
   task_type: z.enum(['agent-prompt', 'plugin-tool']),
@@ -76,6 +77,8 @@ export const CronJobSchema = JobBaseSchema.extend({
   run_at: z.null(),
   max_runs: z.number().nullable(),
   session_id: z.string().nullable(),
+  session_source_id: z.string().nullable(),
+  session_workspace_target: WorkspaceTargetSchema.nullable(),
 });
 
 export const OneTimeJobSchema = JobBaseSchema.extend({
@@ -105,8 +108,7 @@ export function schedulerTaskForJob(job: Job) {
       : {
           type: 'agent-prompt',
           prompt: job.prompt,
-          mode: job.mode,
-          workspaceTarget: job.workspace_target,
+          workspaceTarget: job.workspace_target ?? 'appweaver',
         },
   );
 }

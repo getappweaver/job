@@ -8,7 +8,7 @@ import { z } from 'zod';
 // ---------------------------------------------------------------------------
 // Prompt-only schema (what the model must output)
 //
-// Intentionally omits: backend/provider/model/mode/workspace_target.
+// Runtime model selection and execution policy are resolved by core.
 // These are injected from the core agent defaults after generation.
 // ---------------------------------------------------------------------------
 
@@ -19,8 +19,10 @@ const JobDraftBaseSchema = z.object({
   backend: z.string(),
   provider: z.string(),
   model: z.string(),
-  mode: z.string(),
-  workspace_target: z.string(),
+  model_configured: z.boolean().default(false),
+  model_source_id: z.string().nullable().default(null),
+  workspace_target: z.string().nullable(),
+  sticky_session: z.boolean().default(false),
   budget_sats: z.number().int().positive().nullable(),
   instructions: z.string().nullable(),
 });

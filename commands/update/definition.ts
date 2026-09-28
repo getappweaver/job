@@ -31,6 +31,28 @@ export const updateDefinition = (
       required: false,
     },
     {
+      name: 'modelSource',
+      flag: '--model-source',
+      summary:
+        'Model source provider or alias; inherit follows the workspace default.',
+      kind: 'string',
+      required: false,
+    },
+    {
+      name: 'workspace',
+      flag: '--workspace',
+      summary: 'Workspace: parent, appweaver, or inherit.',
+      kind: 'string',
+      required: false,
+    },
+    {
+      name: 'stickySession',
+      flag: '--sticky-session',
+      summary: 'Reuse the previous session on later runs: true or false.',
+      kind: 'string',
+      required: false,
+    },
+    {
       name: 'prompt',
       flag: '--prompt',
       summary: 'Prompt executed when the job runs.',

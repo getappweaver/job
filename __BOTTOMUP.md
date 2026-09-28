@@ -28,7 +28,7 @@ children:
 # job
 
 ## Purpose
-Job plugin for dm-bot: scheduled job management with cron/one-time execution, AI-assisted draft creation, and a 60s ticker engine.
+Job plugin for dm-bot: scheduled job management with cron/one-time execution, AI-assisted draft creation, a 60s ticker engine, per-job model-source routing, and opt-in sticky sessions.
 
 ## Files
 - `.gitignore` - Ignores *.sqlite* files in plugin directory
@@ -44,12 +44,13 @@ Job plugin for dm-bot: scheduled job management with cron/one-time execution, AI
 - `package.json` - Plugin manifest: dm-bot-job-plugin v2.0.1, depends on croner and zod
 - `README.md` - User docs: command table, draft flow, engine behavior, data model
 - `reply-tone.ts` - Maps command output text to reply tone: info/success/error
-- `runner.ts` - Job executor: builds backend from job row, runs via runAgent, stores result in job_runs, disables one-time jobs after run
+- `runner.ts` - Job executor: resolves inherited or pinned workspace/source/model, runs with a fresh session by default, reuses sticky sessions only on the same workspace/source, and stores results in job_runs
 
 ## Notes
 - Uses separate SQLite at plugins/jobs/db.sqlite, not core bot DB
 - All commands follow adapter/definition/handler pattern under commands/ subdirs
 - Engine ticks every 60s to run due jobs via ctx.runAgent
+- Job execution settings are stored in `jobs`; optional settings inherit current Core defaults, and scheduler v3 exposes source/model/workspace/sticky-session selection while v1/v2 remain supported.
 
 ## Subdirectories
 - `commands/` - CLI command implementations: each subdir (list, run, ai, etc.) has adapter/definition/handler layers
