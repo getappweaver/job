@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v4.7.1] - 2026-10-01
+
+- fix: added tsconfig.json (7ef892d)
+
 ## [v4.7.0] - 2026-09-28
 
-- feat: supports scheduler.v3, with model-source selection etc (1375781)
+- feat: supports scheduler.v3, with model-source selection etc (d4dd806)
 
 ## [v4.6.0] - 2026-09-08
 
