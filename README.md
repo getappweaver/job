@@ -65,3 +65,14 @@ Creation and mutation (confirm, revise, discard, enable, disable, delete) are do
 
 - **Database:** The plugin uses its own SQLite DB at `plugins/jobs/db.sqlite`.
 - **Tables:** `jobs`, `job_runs`, `job_run_logs`, and `job_drafts` are stored in that DB, separate from core bot job state. Runs and logs are deleted automatically when their job is deleted.
+
+## Architecture
+
+See [local architecture and source map](docs/architecture.md).
+
+## Local modules
+
+- [types](types/README.md)
+- [drafts](drafts/README.md)
+- [db](db/README.md)
+- [commands](commands/README.md)

@@ -14,6 +14,7 @@ import {
   type SchedulerCreateInputV3,
   type SchedulerTaskV3,
 } from '@src/capabilities/scheduler.v3';
+import { SchedulerV4 } from '@src/capabilities/scheduler.v4';
 import { defineCapabilityProvider } from '@src/capabilities/types';
 import { CapabilityResourceNotFoundError } from '@src/core/capabilities/errors';
 import type { WebNode, WebNodeRoot } from '@src/web/ui-schema';
@@ -22,7 +23,10 @@ import { renderJobListComponent } from './commands/list/component';
 import {
   createJob,
   createSchedulerResourceForJob,
+  deleteJob,
+  deleteSchedulerResource,
   disableJob,
+  enableJob,
   getJob,
   getSchedulerResource,
   listSchedulerResources,
@@ -693,6 +697,273 @@ export const jobSchedulerV3Provider = defineCapabilityProvider({
       }
 
       return summaryV3(providerId, input.resourceId, job);
+    },
+  },
+});
+
+function summaryV4(providerId: string, resourceId: string, job: Job) {
+  return {
+    resource: {
+      capability: { name: 'scheduler', version: 4 },
+      providerId,
+      resourceType: 'schedule',
+      resourceId,
+    },
+    status: 'created' as const,
+    name: job.name,
+    enabled: Boolean(job.enabled),
+    scheduleDescription: job.schedule_description,
+    nextRunAt: job.next_run_at,
+    task: taskV3(job),
+  };
+}
+
+export const jobSchedulerV4Provider = defineCapabilityProvider({
+  contract: SchedulerV4,
+  operations: {
+    [SchedulerV4.operations.create.id]: async ({ input, providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const jobInput = draftInputV3(input);
+
+      const create = db.transaction(() => {
+        const job = createJob(db, jobInput);
+
+        if (!input.enabled) {
+          disableJob(db, job.id);
+        }
+
+        const resourceId = createSchedulerResourceForJob({
+          db,
+          jobId: job.id,
+          enabled: input.enabled,
+        });
+
+        return { job: getJob(db, job.id) ?? job, resourceId };
+      });
+
+      const created = create();
+
+      return {
+        ...summaryV4(providerId, created.resourceId, created.job),
+        review: null,
+      };
+    },
+    [SchedulerV4.operations.list.id]: async ({ providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+
+      const schedules = listSchedulerResources(db).flatMap((mapping) => {
+        const job = mapping.jobId === null ? null : getJob(db, mapping.jobId);
+
+        return job ? [summaryV4(providerId, mapping.resourceId, job)] : [];
+      });
+
+      return {
+        schedules,
+        view: renderJobListComponent({
+          command: alias,
+          prefix: '/',
+          jobs: schedules.flatMap((schedule) => {
+            const mapping = getSchedulerResource(
+              db,
+              schedule.resource.resourceId,
+            );
+
+            const job = mapping?.jobId ? getJob(db, mapping.jobId) : null;
+
+            return job ? [job] : [];
+          }),
+        }),
+      };
+    },
+    [SchedulerV4.operations.show.id]: async ({ input, providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const mapping = getSchedulerResource(db, input.resourceId);
+      const job = mapping?.jobId ? getJob(db, mapping.jobId) : null;
+
+      if (!mapping || !job) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV4.capability,
+          input.resourceId,
+        );
+      }
+
+      return {
+        ...summaryV4(providerId, input.resourceId, job),
+        view: renderJobListComponent({
+          command: alias,
+          prefix: '/',
+          jobs: [job],
+        }),
+      };
+    },
+    [SchedulerV4.operations['update-task'].id]: async ({
+      input,
+      providerId,
+    }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const mapping = getSchedulerResource(db, input.resourceId);
+
+      if (!mapping?.jobId) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV4.capability,
+          input.resourceId,
+        );
+      }
+
+      const update = db.transaction(() => {
+        const previous = getJob(db, mapping.jobId!);
+
+        if (!previous) {
+          throw new CapabilityResourceNotFoundError(
+            SchedulerV4.capability,
+            input.resourceId,
+          );
+        }
+
+        updateJobTask(db, previous.id, input.task);
+
+        return updateJobDetails({
+          db,
+          id: previous.id,
+          name: previous.name,
+          prompt:
+            input.task.type === 'agent-prompt'
+              ? input.task.prompt
+              : previous.prompt,
+          model:
+            input.task.type === 'agent-prompt'
+              ? (input.task.modelId ?? '')
+              : '',
+          modelConfigured:
+            input.task.type === 'agent-prompt' && input.task.modelId !== null,
+          modelSourceId:
+            input.task.type === 'agent-prompt'
+              ? input.task.modelSourceId
+              : null,
+          workspaceTarget:
+            input.task.type === 'agent-prompt'
+              ? input.task.workspaceTarget
+              : null,
+          stickySession:
+            input.task.type === 'agent-prompt'
+              ? input.task.stickySession
+              : false,
+          instructions: previous.instructions,
+        });
+      });
+
+      const job = update();
+
+      if (!job) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV4.capability,
+          input.resourceId,
+        );
+      }
+
+      return summaryV4(providerId, input.resourceId, job);
+    },
+    [SchedulerV4.operations.enable.id]: async ({ input, providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const mapping = getSchedulerResource(db, input.resourceId);
+
+      if (!mapping?.jobId) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV4.capability,
+          input.resourceId,
+        );
+      }
+
+      enableJob(db, mapping.jobId);
+      const job = getJob(db, mapping.jobId);
+
+      if (!job) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV4.capability,
+          input.resourceId,
+        );
+      }
+
+      return summaryV4(providerId, input.resourceId, job);
+    },
+    [SchedulerV4.operations.disable.id]: async ({ input, providerId }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const mapping = getSchedulerResource(db, input.resourceId);
+
+      if (!mapping?.jobId) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV4.capability,
+          input.resourceId,
+        );
+      }
+
+      disableJob(db, mapping.jobId);
+      const job = getJob(db, mapping.jobId);
+
+      if (!job) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV4.capability,
+          input.resourceId,
+        );
+      }
+
+      return summaryV4(providerId, input.resourceId, job);
+    },
+    [SchedulerV4.operations.delete.id]: async ({ input }) => {
+      if (!JobPluginDb) {
+        throw new Error('Job plugin database is not initialized.');
+      }
+
+      const db = JobPluginDb;
+      const mapping = getSchedulerResource(db, input.resourceId);
+
+      if (!mapping) {
+        throw new CapabilityResourceNotFoundError(
+          SchedulerV4.capability,
+          input.resourceId,
+        );
+      }
+
+      const deleted = db.transaction(() => {
+        let jobDeleted = true;
+
+        if (mapping.jobId) {
+          jobDeleted = deleteJob(db, mapping.jobId);
+        }
+
+        deleteSchedulerResource(db, input.resourceId);
+
+        return jobDeleted;
+      })();
+
+      return {
+        resourceId: input.resourceId,
+        deleted,
+      };
     },
   },
 });

@@ -136,3 +136,14 @@ export function listSchedulerResources(db: Database): SchedulerResourceRow[] {
     jobId: row.job_id,
   }));
 }
+
+export function deleteSchedulerResource(
+  db: Database,
+  resourceId: string,
+): boolean {
+  const info = db
+    .prepare('DELETE FROM job_scheduler_resources WHERE resource_id = ?')
+    .run(resourceId);
+
+  return info.changes > 0;
+}

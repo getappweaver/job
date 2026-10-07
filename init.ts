@@ -26,6 +26,7 @@ import {
   jobSchedulerProvider,
   jobSchedulerV2Provider,
   jobSchedulerV3Provider,
+  jobSchedulerV4Provider,
 } from './scheduler-provider';
 import { jobStories } from './stories';
 
@@ -100,5 +101,6 @@ export const JobPlugin: BotPlugin = {
     jobSchedulerProvider,
     jobSchedulerV2Provider,
     jobSchedulerV3Provider,
+    jobSchedulerV4Provider,
   ],
 };

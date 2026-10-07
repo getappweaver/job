@@ -32,4 +32,5 @@ export {
   linkSchedulerResourceToJob,
   getSchedulerResource,
   listSchedulerResources,
+  deleteSchedulerResource,
 } from './scheduler-resources';
