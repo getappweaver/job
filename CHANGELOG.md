@@ -4,9 +4,13 @@ All notable changes for each version are listed under the corresponding `v*.*.*`
 Tags and this file are updated by the post-commit hook when you commit with `--patch`, `--minor`, or `--major` (see CONTRIBUTING.md).
 You can also run `bun run release:changelog` to rewrite this file from tags.
 
+## [v4.9.0] - 2026-10-26
+
+- feat: implemented universal search via search.v1 capability (a9278d7)
+
 ## [v4.8.1] - 2026-10-16
 
-- fix: docs (ad22592)
+- fix: docs (2281ac3)
 
 ## [v4.8.0] - 2026-10-07
 

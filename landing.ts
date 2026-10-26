@@ -26,12 +26,14 @@ export const landingPage: PluginLandingDefinition = {
         {
           view: 'desktop',
           src: 'landing/assets/job-ai.gif',
+          poster: null,
           alt: 'Job Scheduler creating a scheduled job with AI',
           durationMs: 22380,
         },
         {
           view: 'mobile',
           src: 'landing/assets/job-ai-mobile.gif',
+          poster: null,
           alt: 'Job Scheduler mobile flow creating a scheduled job with AI',
           durationMs: 32260,
         },

@@ -28,6 +28,7 @@ import {
   jobSchedulerV3Provider,
   jobSchedulerV4Provider,
 } from './scheduler-provider';
+import { jobSearchProviders } from './search-provider';
 import { jobStories } from './stories';
 
 const pluginDir = import.meta.dir;
@@ -102,5 +103,10 @@ export const JobPlugin: BotPlugin = {
     jobSchedulerV2Provider,
     jobSchedulerV3Provider,
     jobSchedulerV4Provider,
+    ...jobSearchProviders({
+      getDb: () => JobPluginDb ?? openDb(),
+      alias,
+      pluginName: jobPkg.name,
+    }),
   ],
 };

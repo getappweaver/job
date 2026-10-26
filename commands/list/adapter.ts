@@ -16,6 +16,7 @@ export function adaptListCommand(
       command: params.alias,
       prefix: params.prefix,
       jobs,
+      focusedJobId: null,
     });
   }
 

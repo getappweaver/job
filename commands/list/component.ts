@@ -156,8 +156,12 @@ function jobScheduleLabel(job: Job): string {
     : job.schedule_description;
 }
 
-function jobCard(params: { command: string; job: Job }): WebNode {
-  const { command, job } = params;
+function jobCard(params: {
+  command: string;
+  job: Job;
+  focused: boolean;
+}): WebNode {
+  const { command, job, focused } = params;
   const enabled = Boolean(job.enabled);
   const typeLabel = job.execution_type === 'cron' ? 'cron' : 'one-time';
 
@@ -166,7 +170,8 @@ function jobCard(params: { command: string; job: Job }): WebNode {
     tag: 'treeItem',
     props: {
       id: `job-tree-item-${job.id}`,
-      defaultExpanded: false,
+      defaultExpanded: focused,
+      ...(focused ? { focused: true } : {}),
     },
     summary: row(
       [
@@ -321,11 +326,16 @@ function jobCard(params: { command: string; job: Job }): WebNode {
   };
 }
 
-export function renderJobListComponent(params: {
+export type RenderJobListWithFocusProps = {
   command: string;
   prefix: string;
   jobs: Job[];
-}): WebNodeRoot {
+  focusedJobId: number | null;
+};
+
+export function renderJobListWithFocus(
+  params: RenderJobListWithFocusProps,
+): WebNodeRoot {
   return {
     kind: 'ui',
     version: 1,
@@ -359,10 +369,26 @@ export function renderJobListComponent(params: {
                 ui: 'job-tree',
               },
               children: params.jobs.map((job) =>
-                jobCard({ command: params.command, job }),
+                jobCard({
+                  command: params.command,
+                  job,
+                  focused: job.id === params.focusedJobId,
+                }),
               ),
             },
           ]),
     ]),
   };
+}
+
+export type RenderJobListComponentProps = {
+  command: string;
+  prefix: string;
+  jobs: Job[];
+};
+
+export function renderJobListComponent(
+  params: RenderJobListComponentProps,
+): WebNodeRoot {
+  return renderJobListWithFocus({ ...params, focusedJobId: null });
 }

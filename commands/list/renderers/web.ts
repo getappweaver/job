@@ -2,12 +2,15 @@ import type { WebNodeRoot } from '@src/web/ui-schema';
 
 import type { Job } from '../../../types';
 
-import { renderJobListComponent } from '../component';
+import { renderJobListWithFocus } from '../component';
 
-export function renderListWeb(params: {
+export type RenderListWebProps = {
   command: string;
   prefix: string;
   jobs: Job[];
-}): WebNodeRoot {
-  return renderJobListComponent(params);
+  focusedJobId: number | null;
+};
+
+export function renderListWeb(params: RenderListWebProps): WebNodeRoot {
+  return renderJobListWithFocus(params);
 }
